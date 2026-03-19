@@ -2,20 +2,25 @@ use datafusion::prelude::SessionContext;
 
 use crate::{
     app::service::Service,
-    domain::{model::Timespan, port::Querier},
+    domain::{
+        model::Timespan,
+        port::{Querier, RouteDelegator},
+    },
 };
 mod app;
 mod domain;
+mod inbound;
 mod outbound;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
     let sc = SessionContext::new();
-    let state = Service::new(sc.into());
-    let res = state
+    let router = axum::Router::<()>::new();
+    let service = Service::new(sc.into(), router.into());
+    let res = service
         .querier
         .query_selected_time(Timespan::new(1700000220050000, 1700000220210000))
         .await;
     println!("{:#?}", res.unwrap());
-    Ok(())
+    service.router.serve().await;
 }

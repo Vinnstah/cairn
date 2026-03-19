@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
-use crate::domain::port::Querier;
+use crate::domain::port::{Querier, RouteDelegator};
 
-pub struct Service<QR: Querier> {
-    pub querier: Arc<QR>,
+pub struct Service<Q: Querier, R: RouteDelegator> {
+    pub querier: Arc<Q>,
+    pub router: Arc<R>,
 }
 
-impl<QR: Querier> Service<QR> {
-    pub fn new(querier: Arc<QR>) -> Self {
-        Self { querier }
+impl<Q: Querier, R: RouteDelegator> Service<Q, R> {
+    pub fn new(querier: Arc<Q>, router: Arc<R>) -> Self {
+        Self { querier, router }
     }
 }
