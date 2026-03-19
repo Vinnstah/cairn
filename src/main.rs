@@ -1,19 +1,21 @@
 use datafusion::prelude::SessionContext;
 
 use crate::{
-    client::AppState,
-    querier::querier::{Querier, Timespan},
+    app::service::Service,
+    domain::{model::Timespan, port::Querier},
 };
-mod client;
-mod querier;
+mod app;
+mod domain;
+mod outbound;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sc = SessionContext::new();
-    let state = AppState::new(sc.into());
-    let _ = state
+    let state = Service::new(sc.into());
+    let res = state
         .querier
         .query_selected_time(Timespan::new(1700000220050000, 1700000220210000))
         .await;
+    println!("{:#?}", res.unwrap());
     Ok(())
 }
