@@ -1,25 +1,36 @@
-// use axum::routing::get;
+use std::{collections::HashMap, sync::Arc};
 
-// impl<S> RouteDelegator for axum::Router<S>
-// where
-//     S: Clone + Send + Sync + 'static,
-// {
-//     async fn serve(&self) -> () {
-//         let app = axum::Router::new().route("/", get(|| async { "Hello, World!" }));
-//         // run our app with hyper, listening globally on port 3000
-//         let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-//         axum::serve(listener, app).await.unwrap();
-//     }
+use axum::{
+    Router,
+    extract::{Query, State},
+    response::IntoResponse,
+    routing::get,
+};
 
-//     async fn handle_get_timesequence(
-//         &self,
-//         querier: impl Querier,
-//         timespan: crate::core::domain::model::Timespan,
-//     ) -> Result<String, ()> {
-//         self.route(
-//             "/",
-//             get(|| async { querier.query_selected_time(timespan).await }),
-//         );
-//         Ok(())
-//     }
-// }
+use crate::core::ports::inbound::data_query::DataQuery;
+
+pub fn routes(service: Arc<dyn DataQuery>) -> Router {
+    Router::new()
+        .route("/timespan", get(fetch_timespan_handler))
+        .with_state(service)
+}
+
+#[axum::debug_handler]
+pub async fn fetch_timespan_handler(
+    State(service): State<Arc<dyn DataQuery>>,
+    Query(params): Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    match service
+        .fetch_selected_time(crate::core::domain::model::Timespan {
+            start: params["start"]
+                .parse::<u64>()
+                .expect("parse u64 from string"),
+            end: params["end"].parse::<u64>().expect("parse u64 from string"),
+        })
+        .await
+        .map_err(|err| println!("{ :#? }", err))
+    {
+        Ok(result) => println!("{}", result),
+        Err(_) => todo!(),
+    }
+}
