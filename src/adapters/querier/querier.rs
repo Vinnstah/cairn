@@ -1,18 +1,5 @@
-use std::env;
-
-use datafusion::{
-    arrow::util::pretty::pretty_format_batches,
-    error::DataFusionError,
-    prelude::{ParquetReadOptions, SessionContext},
-};
-
-use crate::domain::{
-    model::{DataError, Timespan},
-    port::Querier,
-};
-
-impl Querier for SessionContext {
-    async fn query_selected_time(&self, timespan: Timespan) -> Result<String, DataError> {
+impl DataQueryRepository for SessionContext {
+    async fn query_selected_timespan(&self, timespan: Timespan) -> Result<String, DataError> {
         let home = env::var("HOME").expect("HOME not set");
         let base = format!("{}/Developer/Rust/cairn/data/synthetic_data", home);
 
