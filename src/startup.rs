@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use axum::routing::get;
 use datafusion::prelude::SessionContext;
 
 use crate::{
@@ -13,6 +12,7 @@ use crate::{
 pub async fn start() {
     let router = axum::Router::<()>::new();
     let repo = Arc::new(SessionContext::new());
+    let _ = repo.register_parquets();
     let service = Arc::new(DataQueryService::new(repo));
     let app = router
         .merge(http::query_handlers::routes(service))

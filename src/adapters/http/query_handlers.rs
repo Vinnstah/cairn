@@ -28,9 +28,9 @@ pub async fn fetch_timespan_handler(
             end: params["end"].parse::<u64>().expect("parse u64 from string"),
         })
         .await
-        .map_err(|err| println!("{ :#? }", err))
+        .map_err(|err| err)
     {
         Ok(result) => println!("{}", result),
-        Err(_) => todo!(),
+        Err(err) => println!("{:#?}", err),
     }
 }

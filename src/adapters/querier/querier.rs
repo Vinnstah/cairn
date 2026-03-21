@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, path::PathBuf};
 
 use datafusion::{
     arrow::util::pretty::pretty_format_batches,
@@ -13,26 +13,12 @@ use crate::core::{
 
 #[async_trait::async_trait]
 impl DataQueryRepository for SessionContext {
-    async fn query_selected_timespan(&self, timespan: Timespan) -> Result<String, DataError> {
-        let home = env::var("HOME").expect("HOME not set");
-        let base = format!("{}/Developer/Rust/cairn/data/nvidia_physical_dataset", home);
-
-        self.register_parquet(
-            "feature_presence",
-            &format!("{}/feature_presence/", base),
-            ParquetReadOptions::default(),
-        )
-        .await?;
-        let _ = self
-            .register_parquet(
-                "data_collection",
-                "~/Developer/Rust/cairn/data/nvidia_physical_dataset/",
-                ParquetReadOptions::default(),
-            )
-            .await;
+    async fn query_selected_timespan(
+        &self,
+        timespan: Timespan,
+    ) -> anyhow::Result<String, DataError> {
         let df = self
-            .sql(format!("SELECT clip_id FROM feature_presence ").as_str())
-            // .sql(format!("SELECT clip_id FROM feature_presence WHERE timestamp >= {} and timestamp <= {} ORDER BY timestamp", timespan.start, timespan.end).as_str())
+            .sql(format!("SELECT * FROM feature_presence LIMIT 10").as_str())
             .await?;
         df.clone()
             .collect()
@@ -43,6 +29,39 @@ impl DataQueryRepository for SessionContext {
                     .expect("pretty format RecordBatch")
                     .to_string()
             })
+    }
+
+    async fn register_parquets(&self) -> anyhow::Result<()> {
+        // The dataset is saved locally at ./data/nvidia_physical_dataset
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/nvidia_physical_dataset");
+
+        self.register_parquet(
+            "ego_motion",
+            base.join("egomotion.chunk_*/*.parquet").to_str().unwrap(),
+            ParquetReadOptions::default(),
+        )
+        .await?;
+
+        self.register_parquet(
+            "data_collection",
+            base.join("metadata/data_collection.parquet")
+                .to_str()
+                .unwrap(),
+            ParquetReadOptions::default(),
+        )
+        .await?;
+
+        self.register_parquet(
+            "feature_presence",
+            base.join("metadata/feature_presence.parquet")
+                .to_str()
+                .unwrap(),
+            ParquetReadOptions::default(),
+        )
+        .await?;
+
+        println!("Registered parquets from {}", base.display());
+        Ok(())
     }
 }
 
