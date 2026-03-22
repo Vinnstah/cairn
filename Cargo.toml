@@ -8,4 +8,5 @@ anyhow = "1.0.102"
 async-trait = "0.1.89"
 axum = { version = "0.8.8", features = ["macros"] }
 datafusion = "52.3.0"
+rerun = "0.30.2"
 tokio = { version = "1.50.0", features = ["full"] }
