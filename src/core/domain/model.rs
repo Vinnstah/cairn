@@ -11,7 +11,7 @@ impl Timespan {
 
 #[derive(Debug)]
 pub struct DataError {
-    error_msg: String,
+    pub error_msg: String,
 }
 
 impl DataError {

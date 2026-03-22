@@ -5,19 +5,47 @@ use datafusion::prelude::SessionContext;
 use crate::{
     adapters::http,
     core::ports::{
-        data_query_service::DataQueryService, outbound::data_repository::DataQueryRepository,
+        data_query_service::DataQueryService,
+        inbound::data_query::DataQuery,
+        outbound::{
+            data_repository::DataQueryRepository, visualizer_repository::VisualizerRepository,
+        },
+        visualizer_service::VisualizerService,
     },
 };
 
 pub async fn start() {
     let router = axum::Router::<()>::new();
-    let repo = Arc::new(SessionContext::new());
-    let _ = repo.register_parquets();
-    let service = Arc::new(DataQueryService::new(repo));
+    let querier_repo = Arc::new(SessionContext::new());
+    let visualizer_repo = rerun::RecordingStreamBuilder::new("visualizer_repo")
+        .spawn()
+        .expect("create recording_stream");
+    let app_state = AppState::new(querier_repo, Arc::new(visualizer_repo));
+    let _ = app_state.querier.register_tables().await;
     let app = router
-        .merge(http::query_handlers::routes(service))
+        .merge(http::query_handlers::routes(app_state))
         .merge(http::health_handlers::routes());
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    pub querier: DataQueryService,
+    pub visualizer: VisualizerService,
+}
+
+impl AppState {
+    pub fn new(
+        querier: Arc<dyn DataQueryRepository + Send + Sync>,
+        visualizer: Arc<dyn VisualizerRepository + Send + Sync>,
+    ) -> Self {
+        let data_query_service = DataQueryService::new(querier);
+        let visualizer_service = VisualizerService::new(visualizer);
+        Self {
+            querier: data_query_service,
+            visualizer: visualizer_service,
+        }
+    }
 }

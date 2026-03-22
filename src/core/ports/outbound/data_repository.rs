@@ -6,5 +6,5 @@ pub trait DataQueryRepository {
         &self,
         timespan: Timespan,
     ) -> anyhow::Result<String, DataError>;
-    async fn register_parquets(&self) -> anyhow::Result<()>;
+    async fn register_tables(&self) -> anyhow::Result<()>;
 }
