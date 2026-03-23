@@ -1,7 +1,7 @@
 use crate::core::domain::model::{DataError, Timespan};
 
 #[async_trait::async_trait]
-pub trait DataQueryRepository {
+pub trait DataStore {
     async fn query_selected_timespan(
         &self,
         timespan: Timespan,

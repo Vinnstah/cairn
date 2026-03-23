@@ -7,10 +7,8 @@ use crate::{
     core::ports::{
         data_query_service::DataQueryService,
         inbound::data_query::DataQuery,
-        outbound::{
-            data_repository::DataQueryRepository, visualizer_repository::VisualizerRepository,
-        },
-        visualizer_service::VisualizerService,
+        outbound::{data_store::DataStore, replay::Replay},
+        replay_service::ReplayService,
     },
 };
 
@@ -33,16 +31,16 @@ pub async fn start() {
 #[derive(Clone)]
 pub struct AppState {
     pub querier: DataQueryService,
-    pub visualizer: VisualizerService,
+    pub visualizer: ReplayService,
 }
 
 impl AppState {
     pub fn new(
-        querier: Arc<dyn DataQueryRepository + Send + Sync>,
-        visualizer: Arc<dyn VisualizerRepository + Send + Sync>,
+        querier: Arc<dyn DataStore + Send + Sync>,
+        visualizer: Arc<dyn Replay + Send + Sync>,
     ) -> Self {
         let data_query_service = DataQueryService::new(querier);
-        let visualizer_service = VisualizerService::new(visualizer);
+        let visualizer_service = ReplayService::new(visualizer);
         Self {
             querier: data_query_service,
             visualizer: visualizer_service,

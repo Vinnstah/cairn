@@ -1,16 +1,17 @@
 use std::sync::Arc;
 
-use crate::core::ports::{
-    inbound::data_query::DataQuery, outbound::data_repository::DataQueryRepository,
+use crate::core::{
+    domain::model::ClipSearchParams,
+    ports::{inbound::data_query::DataQuery, outbound::data_store::DataStore},
 };
 
 #[derive(Clone)]
 pub struct DataQueryService {
-    repo: Arc<dyn DataQueryRepository + Send + Sync>,
+    repo: Arc<dyn DataStore + Send + Sync>,
 }
 
 impl DataQueryService {
-    pub fn new(repo: Arc<dyn DataQueryRepository + Send + Sync>) -> Self {
+    pub fn new(repo: Arc<dyn DataStore + Send + Sync>) -> Self {
         Self { repo }
     }
 }
@@ -27,5 +28,9 @@ impl DataQuery for DataQueryService {
 
     async fn register_tables(&self) -> anyhow::Result<()> {
         self.repo.register_tables().await
+    }
+
+    async fn search_clips_dataset(&self, params: ClipSearchParams) -> anyhow::Result<Vec<String>> {
+        Ok(vec!["".to_owned()])
     }
 }

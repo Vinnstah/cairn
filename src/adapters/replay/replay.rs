@@ -1,9 +1,9 @@
 use rerun::RecordingStream;
 
-use crate::core::ports::outbound::visualizer_repository::VisualizerRepository;
+use crate::core::ports::outbound::replay::Replay;
 
 #[async_trait::async_trait]
-impl VisualizerRepository for RecordingStream {
+impl Replay for RecordingStream {
     async fn visualize_video(&self, video: rerun::archetypes::AssetVideo) -> anyhow::Result<()> {
         println!("replaying video");
         // TODO handle err gracefully

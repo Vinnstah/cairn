@@ -1,3 +1,3 @@
 pub mod http;
 pub mod querier;
-pub mod visualizer;
+pub mod replay;

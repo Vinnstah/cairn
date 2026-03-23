@@ -19,3 +19,9 @@ impl DataError {
         Self { error_msg }
     }
 }
+
+pub struct ClipSearchParams {
+    pub country: Option<String>,
+    pub min_decel: Option<f64>,
+    pub min_speed: Option<f64>,
+}

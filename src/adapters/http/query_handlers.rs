@@ -9,7 +9,7 @@ use axum::{
 use rerun::AssetVideo;
 
 use crate::{
-    core::ports::{inbound::data_query::DataQuery, outbound::visualizer_repository::Visualize},
+    core::ports::{inbound::data_query::DataQuery, outbound::replay::Replay},
     startup::AppState,
 };
 
@@ -21,10 +21,10 @@ pub fn routes(state: AppState) -> Router {
 
 #[axum::debug_handler]
 pub async fn fetch_timespan_handler(
-    State(service): State<AppState>,
+    State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    match service
+    match state
         .querier
         .fetch_selected_time(crate::core::domain::model::Timespan {
             start: params["start"]
@@ -40,7 +40,7 @@ pub async fn fetch_timespan_handler(
                 .join("data/nvidia_physical_dataset/camera_front_wide_120fov.chunk_0000")
                 .join(clip_id + ".camera_front_wide_120fov.mp4");
             let video_asset = AssetVideo::from_file_path(path).expect("construct video asset");
-            let _ = service.visualizer.visualize_video(video_asset).await;
+            let _ = state.visualizer.visualize_video(video_asset).await;
             Ok(())
         }
         Err(err) => {
