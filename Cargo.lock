@@ -1491,6 +1491,7 @@ dependencies = [
  "axum",
  "datafusion 52.3.0",
  "rerun",
+ "serde",
  "tokio",
 ]
 

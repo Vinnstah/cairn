@@ -30,7 +30,11 @@ impl DataQuery for DataQueryService {
         self.repo.register_tables().await
     }
 
-    async fn search_clips_dataset(&self, params: ClipSearchParams) -> anyhow::Result<Vec<String>> {
-        Ok(vec!["".to_owned()])
+    async fn fetch_clips_with_params(
+        &self,
+        params: ClipSearchParams,
+    ) -> anyhow::Result<Vec<String>> {
+        let result = self.repo.query_clips_with_params(params).await;
+        Ok(result.expect("fetch clips with params"))
     }
 }

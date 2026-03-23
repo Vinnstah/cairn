@@ -1,18 +1,18 @@
-use std::{
-    env,
-    path::{Path, PathBuf},
-};
+use std::{env, path::PathBuf};
 
 use datafusion::{
-    arrow::{self, array::Array},
+    arrow::{
+        self,
+        array::{Array, StringArray},
+    },
     error::DataFusionError,
     prelude::{ParquetReadOptions, SessionContext},
 };
 
 use crate::{
-    adapters::querier::register_helper::register_with_clip_id,
+    adapters::querier::helpers::{build_search_query, register_with_clip_id},
     core::{
-        domain::model::{DataError, Timespan},
+        domain::model::{ClipSearchParams, DataError, Timespan},
         ports::outbound::data_store::DataStore,
     },
 };
@@ -50,6 +50,26 @@ impl DataStore for SessionContext {
             .ok_or_else(|| DataError {
                 error_msg: "No clips found for given timespan".into(),
             })
+    }
+
+    async fn query_clips_with_params(
+        &self,
+        params: ClipSearchParams,
+    ) -> anyhow::Result<Vec<String>> {
+        let df = self.sql(build_search_query(params).as_str()).await?;
+        let batches = df.collect().await?;
+        let mut result = vec![String::new()];
+        for batch in batches {
+            let clips_id = batch
+                .column_by_name("clip_id")
+                .expect("msg")
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .expect("msg");
+            result.push(clips_id.value(0).to_string())
+        }
+        println!("{:#?}", result);
+        Ok(result)
     }
 
     async fn register_tables(&self) -> anyhow::Result<()> {

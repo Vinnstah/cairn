@@ -2,6 +2,8 @@ use std::path::Path;
 
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
 
+use crate::core::domain::model::ClipSearchParams;
+
 pub async fn register_with_clip_id(
     ctx: &SessionContext,
     dir: &Path,
@@ -55,4 +57,35 @@ pub async fn register_with_clip_id(
 
     println!("[{}] registered {} clips", table_name, views.len());
     Ok(())
+}
+
+pub fn build_search_query(params: ClipSearchParams) -> String {
+    let mut wheres: Vec<String> = vec![];
+
+    if let Some(min_speed) = params.min_speed {
+        wheres.push(format!(
+            "AVG(SQRT(e.vx * e.vx + e.vy * e.vy)) > {min_speed}"
+        ));
+    }
+
+    if let Some(min_decel) = params.min_decel {
+        wheres.push(format!(
+            "AVG(SQRT(e.ax * e.ax + e.ay * e.ay)) > {min_decel}"
+        ));
+    }
+
+    let where_clause = if wheres.is_empty() {
+        "1=1".to_owned()
+    } else {
+        wheres.join(" AND ")
+    };
+
+    format!(
+        r#"
+        SELECT e.clip_id
+        FROM ego_motion e
+        GROUP BY e.clip_id
+        HAVING {where_clause}
+        "#
+    )
 }
