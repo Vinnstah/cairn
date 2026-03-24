@@ -1,8 +1,5 @@
+use crate::core::{domain::model::PointCloud, ports::outbound::replay::Replay};
 use std::sync::Arc;
-
-use rerun::Points3D;
-
-use crate::core::ports::outbound::replay::Replay;
 
 #[derive(Clone)]
 pub struct ReplayService {
@@ -22,7 +19,7 @@ impl Replay for ReplayService {
         self.repo.visualize_video(video).await
     }
 
-    async fn replay_point_cloud(&self, point_cloud: Points3D) -> anyhow::Result<()> {
-        self.repo.replay_point_cloud(point_cloud).await
+    async fn replay_point_clouds(&self, point_clouds: Vec<PointCloud>) -> anyhow::Result<()> {
+        self.repo.replay_point_clouds(point_clouds).await
     }
 }

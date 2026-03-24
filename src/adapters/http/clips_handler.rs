@@ -1,21 +1,19 @@
 /// Endpoint to search for specific events or conditions within the dataset. Returns a clip_id to be used for the other endpoints.
 use std::path::PathBuf;
 
-use axum::{
-    Json, Router,
-    extract::{Query, State},
-    http::StatusCode,
-    response::IntoResponse,
-    routing::get,
-};
-use rerun::Points3D;
-
 use crate::{
     core::{
         domain::model::ClipSearchParams,
         ports::{inbound::data_query::DataQuery, outbound::replay::Replay},
     },
     startup::AppState,
+};
+use axum::{
+    Json, Router,
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::get,
 };
 
 pub fn routes(state: AppState) -> Router {
@@ -55,23 +53,14 @@ async fn clips_replay_handler(
                     );
                     continue;
                 }
-                let mut point_clouds: Vec<Points3D> = Vec::with_capacity(20);
-
-                // Don't loop here, the replay should accept a Vec of Point3D
-                for i in 1..20 {
-                    let point_cloud = state
-                        .querier
-                        .fetch_point_cloud(&clip_id, i)
-                        .await
-                        .expect("get pc");
-                    point_clouds.push(Points3D::new(point_cloud));
-                    state
-                        .replayer
-                        .replay_point_cloud(point_clouds[i - 1].clone())
-                        .await;
-                }
+                let point_clouds = state
+                    .querier
+                    .fetch_point_clouds(&clip_id, 50)
+                    .await
+                    .expect("fetch point clouds");
+                let _ = state.replayer.replay_point_clouds(point_clouds).await;
             }
-            (StatusCode::OK, Json("result")).into_response()
+            (StatusCode::OK, Json("success")).into_response()
         }
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
     }

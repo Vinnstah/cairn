@@ -1,4 +1,4 @@
-use crate::core::domain::model::{ClipSearchParams, DataError};
+use crate::core::domain::model::{ClipSearchParams, DataError, PointCloud};
 
 #[async_trait::async_trait]
 pub trait DataQuery: Send + Sync {
@@ -7,9 +7,9 @@ pub trait DataQuery: Send + Sync {
         &self,
         params: ClipSearchParams,
     ) -> anyhow::Result<Vec<String>>;
-    async fn fetch_point_cloud(
+    async fn fetch_point_clouds(
         &self,
         clip_id: &str,
-        spin_index: usize,
-    ) -> Result<Vec<[f32; 3]>, DataError>;
+        num_spins: usize,
+    ) -> Result<Vec<PointCloud>, DataError>;
 }

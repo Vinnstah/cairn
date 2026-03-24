@@ -1,12 +1,11 @@
 use datafusion::{
     arrow::{
         self,
-        array::{Array, StringArray},
+        array::{Array, RecordBatch, StringArray},
     },
     error::DataFusionError,
     prelude::{ParquetReadOptions, SessionContext},
 };
-use draco_rs::pointcloud::PointCloud;
 use draco_rs::prelude::ffi::draco::GeometryAttribute_Type;
 use draco_rs::prelude::{Decoder, DecoderBuffer};
 use std::{env, path::PathBuf};
@@ -14,7 +13,7 @@ use std::{env, path::PathBuf};
 use crate::{
     adapters::querier::helpers::{build_search_query, register_with_clip_id},
     core::{
-        domain::model::{ClipSearchParams, DataError},
+        domain::model::{ClipSearchParams, DataError, PointCloud},
         ports::outbound::data_store::DataStore,
     },
 };
@@ -97,22 +96,60 @@ impl DataStore for SessionContext {
         Ok(())
     }
 
-    async fn query_point_cloud(
+    async fn query_point_clouds(
         &self,
         clip_id: &str,
-        spin_index: usize,
-    ) -> Result<Vec<[f32; 3]>, DataError> {
-        load_point_cloud(self, clip_id, spin_index)
+        num_spins: usize,
+    ) -> Result<Vec<PointCloud>, DataError> {
+        load_point_clouds(self, clip_id, num_spins)
             .await
             .map_err(|e| DataError::new(e.to_string()))
     }
 }
 
-async fn load_point_cloud(
+fn convert_record_batches_to_point_clouds(batches: &mut Vec<RecordBatch>) -> Vec<PointCloud> {
+    let mut point_clouds: Vec<PointCloud> = vec![];
+
+    for batch in batches.iter_mut() {
+        let draco_col = batch
+            .column_by_name("draco_encoded_pointcloud")
+            .expect("draco column not found")
+            .as_any()
+            .downcast_ref::<arrow::array::BinaryViewArray>()
+            .expect("draco column is not BinaryViewArray");
+
+        for i in 0..draco_col.len() {
+            let draco_bytes = draco_col.value(i);
+            let mut buffer = DecoderBuffer::from_buffer(draco_bytes);
+            let mut decoder = Decoder::new();
+            match draco_rs::pointcloud::PointCloud::from_buffer(&mut decoder, &mut buffer) {
+                Ok(mut pc) => {
+                    let attr_id = pc.get_named_attribute_id(GeometryAttribute_Type::POSITION, 0);
+
+                    let num_points = pc.num_points();
+                    let mut points: Vec<[f32; 3]> = Vec::with_capacity(num_points as usize);
+
+                    for i in 0..num_points {
+                        let p = pc.get_point_alloc::<f32, 3>(attr_id.expect("attri id"), i);
+                        points.push(p);
+                    }
+
+                    point_clouds.push(points.into())
+                }
+                Err(e) => eprintln!("[warn] failed to decode spin {}: {:?}", i, e),
+            }
+        }
+    }
+
+    println!("number of point clouds, {:#?}", point_clouds.len());
+    point_clouds
+}
+
+async fn load_point_clouds(
     ctx: &SessionContext,
     clip_id: &str,
-    spin_index: usize,
-) -> anyhow::Result<Vec<[f32; 3]>> {
+    num_spins: usize,
+) -> anyhow::Result<Vec<PointCloud>> {
     let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("data/nvidia_physical_dataset/lidar.chunk_0000");
 
@@ -127,40 +164,13 @@ async fn load_point_cloud(
             "SELECT draco_encoded_pointcloud
          FROM lidar
          WHERE clip_id = '{clip_id}'
-         AND spin_index = {spin_index}",
+         AND spin_index <= {num_spins}",
         ))
         .await?;
 
-    let batches = df.collect().await?;
-    let batch = batches
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("No spin {} for clip {}", spin_index, clip_id))?;
-    let draco_col = batch
-        .column_by_name("draco_encoded_pointcloud")
-        .ok_or_else(|| anyhow::anyhow!("draco column not found"))?
-        .as_any()
-        .downcast_ref::<arrow::array::BinaryViewArray>()
-        .ok_or_else(|| anyhow::anyhow!("draco column is not BinaryViewArray"))?;
-
-    let draco_bytes = draco_col.value(0);
-
-    let mut buffer = DecoderBuffer::from_buffer(draco_bytes);
-    let mut decoder = Decoder::new();
-    let mut pc = PointCloud::from_buffer(&mut decoder, &mut buffer)
-        .map_err(|e| anyhow::anyhow!("Draco decode failed: {:?}", e))?;
-
-    let attr_id = pc.get_named_attribute_id(GeometryAttribute_Type::POSITION, 0);
-
-    let num_points = pc.num_points();
-    println!("number of points, {:#?}", num_points);
-    let mut points: Vec<[f32; 3]> = Vec::with_capacity(num_points as usize);
-
-    for i in 0..num_points {
-        let p = pc.get_point_alloc::<f32, 3>(attr_id.expect("attri id"), i);
-        points.push(p);
-    }
-
-    Ok(points)
+    let mut batches = df.collect().await?;
+    let point_clouds = convert_record_batches_to_point_clouds(&mut batches);
+    Ok(point_clouds)
 }
 
 impl From<DataFusionError> for DataError {
