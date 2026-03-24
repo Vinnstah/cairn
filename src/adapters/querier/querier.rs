@@ -29,10 +29,10 @@ impl DataStore for SessionContext {
         for batch in batches {
             let clips_id = batch
                 .column_by_name("clip_id")
-                .expect("msg")
+                .expect("get column by name")
                 .as_any()
                 .downcast_ref::<StringArray>()
-                .expect("msg");
+                .expect("downcast as StringArray");
             result.push(clips_id.value(0).to_string())
         }
         Ok(result)
@@ -92,6 +92,7 @@ impl DataStore for SessionContext {
         )
         .await?;
 
+        // TODO: Register all folders as tables
         println!("Registered parquets from {}", base.display());
         Ok(())
     }
@@ -151,6 +152,7 @@ impl From<DataFusionError> for DataError {
     }
 }
 
+// Add newtype to get around orphan-rule.
 pub struct PointClouds(pub Vec<PointCloud>);
 
 impl TryFrom<RecordBatch> for PointClouds {
