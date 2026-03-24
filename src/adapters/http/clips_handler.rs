@@ -57,6 +57,7 @@ async fn clips_replay_handler(
                 }
                 let mut point_clouds: Vec<Points3D> = Vec::with_capacity(20);
 
+                // Don't loop here, the replay should accept a Vec of Point3D
                 for i in 1..20 {
                     let point_cloud = state
                         .querier

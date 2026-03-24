@@ -20,14 +20,6 @@ impl DataQueryService {
 
 #[async_trait::async_trait]
 impl DataQuery for DataQueryService {
-    async fn fetch_selected_time(
-        &self,
-        timespan: crate::core::domain::model::Timespan,
-    ) -> Result<String, crate::core::domain::model::DataError> {
-        // TODO: Add logging, metrics and telemetry here
-        self.repo.query_selected_timespan(timespan).await
-    }
-
     async fn register_tables(&self) -> anyhow::Result<()> {
         self.repo.register_tables().await
     }

@@ -1,14 +1,3 @@
-pub struct Timespan {
-    pub start: u64,
-    pub end: u64,
-}
-
-impl Timespan {
-    pub fn new(start: u64, end: u64) -> Self {
-        Self { start, end }
-    }
-}
-
 #[derive(Debug)]
 pub struct DataError {
     pub error_msg: String,

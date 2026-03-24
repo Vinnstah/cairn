@@ -14,46 +14,12 @@ use std::{env, path::PathBuf};
 use crate::{
     adapters::querier::helpers::{build_search_query, register_with_clip_id},
     core::{
-        domain::model::{ClipSearchParams, DataError, Timespan},
+        domain::model::{ClipSearchParams, DataError},
         ports::outbound::data_store::DataStore,
     },
 };
 #[async_trait::async_trait]
 impl DataStore for SessionContext {
-    async fn query_selected_timespan(&self, timespan: Timespan) -> Result<String, DataError> {
-        let df = self
-            .sql(
-                "SELECT e.clip_id
-                 FROM ego_motion e
-                 JOIN camera_timestamps c
-                     ON e.clip_id = c.clip_id
-                     AND ABS(e.timestamp - c.timestamp) < 1000
-                 LIMIT 1",
-            )
-            .await?;
-
-        let batches = df.collect().await.map_err(DataError::from)?;
-
-        batches
-            .first()
-            .and_then(|batch| {
-                batch
-                    .column(0)
-                    .as_any()
-                    .downcast_ref::<arrow::array::StringArray>()
-            })
-            .and_then(|arr| {
-                if arr.is_empty() {
-                    None
-                } else {
-                    Some(arr.value(0).to_string())
-                }
-            })
-            .ok_or_else(|| DataError {
-                error_msg: "No clips found for given timespan".into(),
-            })
-    }
-
     async fn query_clips_with_params(
         &self,
         params: ClipSearchParams,

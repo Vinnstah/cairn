@@ -21,7 +21,6 @@ pub async fn start() {
     let app_state = AppState::new(querier_repo, Arc::new(visualizer_repo));
     let _ = app_state.querier.register_tables().await;
     let app = router
-        .merge(http::query_handlers::routes(app_state.clone()))
         .merge(http::health_handlers::routes())
         .merge(http::clips_handler::routes(app_state.clone()));
     // run our app with hyper, listening globally on port 3000
