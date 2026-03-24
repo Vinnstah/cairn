@@ -1,4 +1,4 @@
-use rerun::RecordingStream;
+use rerun::{Points3D, RecordingStream};
 
 use crate::core::ports::outbound::replay::Replay;
 
@@ -29,6 +29,11 @@ impl Replay for RecordingStream {
                 .columns_of_unit_batches()?,
         )?;
 
+        Ok(())
+    }
+
+    async fn replay_point_cloud(&self, point_cloud: Points3D) -> anyhow::Result<()> {
+        self.log("point_cloud", &point_cloud)?;
         Ok(())
     }
 }

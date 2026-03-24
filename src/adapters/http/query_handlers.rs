@@ -40,7 +40,7 @@ pub async fn fetch_timespan_handler(
                 .join("data/nvidia_physical_dataset/camera_front_wide_120fov.chunk_0000")
                 .join(clip_id + ".camera_front_wide_120fov.mp4");
             let video_asset = AssetVideo::from_file_path(path).expect("construct video asset");
-            let _ = state.visualizer.visualize_video(video_asset).await;
+            let _ = state.replayer.visualize_video(video_asset).await;
             Ok(())
         }
         Err(err) => {

@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
+use rerun::Points3D;
+
 use crate::core::{
-    domain::model::ClipSearchParams,
+    domain::model::{ClipSearchParams, DataError},
     ports::{inbound::data_query::DataQuery, outbound::data_store::DataStore},
 };
 
@@ -36,5 +38,13 @@ impl DataQuery for DataQueryService {
     ) -> anyhow::Result<Vec<String>> {
         let result = self.repo.query_clips_with_params(params).await;
         Ok(result.expect("fetch clips with params"))
+    }
+
+    async fn fetch_point_cloud(
+        &self,
+        clip_id: &str,
+        spin_index: usize,
+    ) -> Result<Vec<[f32; 3]>, DataError> {
+        self.repo.query_point_cloud(clip_id, spin_index).await
     }
 }

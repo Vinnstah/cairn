@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use rerun::Points3D;
+
 use crate::core::ports::outbound::replay::Replay;
 
 #[derive(Clone)]
@@ -18,5 +20,9 @@ impl Replay for ReplayService {
     async fn visualize_video(&self, video: rerun::archetypes::AssetVideo) -> anyhow::Result<()> {
         // TODO: Add logging, metrics and telemetry here
         self.repo.visualize_video(video).await
+    }
+
+    async fn replay_point_cloud(&self, point_cloud: Points3D) -> anyhow::Result<()> {
+        self.repo.replay_point_cloud(point_cloud).await
     }
 }

@@ -11,4 +11,9 @@ pub trait DataStore {
         &self,
         params: ClipSearchParams,
     ) -> anyhow::Result<Vec<String>>;
+    async fn query_point_cloud(
+        &self,
+        clip_id: &str,
+        spin_index: usize,
+    ) -> Result<Vec<[f32; 3]>, DataError>;
 }

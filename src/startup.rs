@@ -32,19 +32,19 @@ pub async fn start() {
 #[derive(Clone)]
 pub struct AppState {
     pub querier: DataQueryService,
-    pub visualizer: ReplayService,
+    pub replayer: ReplayService,
 }
 
 impl AppState {
     pub fn new(
         querier: Arc<dyn DataStore + Send + Sync>,
-        visualizer: Arc<dyn Replay + Send + Sync>,
+        replayer: Arc<dyn Replay + Send + Sync>,
     ) -> Self {
         let data_query_service = DataQueryService::new(querier);
-        let visualizer_service = ReplayService::new(visualizer);
+        let replay_service = ReplayService::new(replayer);
         Self {
             querier: data_query_service,
-            visualizer: visualizer_service,
+            replayer: replay_service,
         }
     }
 }
