@@ -8,6 +8,7 @@ use datafusion::{
 };
 use draco_rs::prelude::ffi::draco::GeometryAttribute_Type;
 use draco_rs::prelude::{Decoder, DecoderBuffer};
+use log::info;
 use std::{env, path::PathBuf};
 
 use crate::{
@@ -41,29 +42,18 @@ impl DataStore for SessionContext {
     async fn register_tables(&self) -> anyhow::Result<()> {
         // The dataset is saved locally at ./data/nvidia_physical_dataset
         let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/nvidia_physical_dataset");
-        register_with_clip_id(
-            self,
-            &base.join("egomotion.chunk_0000"),
-            ".egomotion.parquet",
-            "ego_motion",
-        )
-        .await?;
 
-        register_with_clip_id(
-            self,
-            &base.join("camera_front_wide_120fov.chunk_0000"),
-            ".camera_front_wide_120fov.timestamps.parquet",
-            "camera_timestamps",
-        )
-        .await?;
-
-        register_with_clip_id(
-            self,
-            &base.join("lidar.chunk_0000"),
-            ".lidar_top_360fov.parquet",
-            "lidar",
-        )
-        .await?;
+        for (folder, file_ext, table_name) in [
+            ("egomotion.chunk_0000", ".egomotion.parquet", "ego_motion"),
+            (
+                "camera_front_wide_120fov.chunk_0000",
+                ".camera_front_wide_120fov.timestamps.parquet",
+                "camera_timestamps",
+            ),
+            ("lidar.chunk_0000", ".lidar_top_360fov.parquet", "lidar"),
+        ] {
+            register_with_clip_id(self, &base.join(folder), file_ext, table_name).await?;
+        }
 
         self.register_parquet(
             "data_collection",
@@ -83,17 +73,8 @@ impl DataStore for SessionContext {
         )
         .await?;
 
-        self.register_parquet(
-            "camera_timestamps",
-            base.join("camera_front_wide_120fov.chunk_0000/*.timestamps.parquet")
-                .to_str()
-                .unwrap(),
-            ParquetReadOptions::default(),
-        )
-        .await?;
-
         // TODO: Register all folders as tables
-        println!("Registered parquets from {}", base.display());
+        info!("Registered parquets from {}", base.display());
         Ok(())
     }
 
@@ -152,7 +133,7 @@ impl From<DataFusionError> for DataError {
     }
 }
 
-// Add newtype to get around orphan-rule.
+// Use newtype to get around orphan-rule.
 pub struct PointClouds(pub Vec<PointCloud>);
 
 impl TryFrom<RecordBatch> for PointClouds {

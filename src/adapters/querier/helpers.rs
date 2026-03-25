@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
+use log::info;
 
 use crate::core::domain::model::ClipSearchParams;
 
@@ -55,7 +56,7 @@ pub async fn register_with_clip_id(
     );
     ctx.sql(&sql).await?.collect().await?;
 
-    println!("[{}] registered {} clips", table_name, views.len());
+    info!("[{}] registered {} clips", table_name, views.len());
     Ok(())
 }
 

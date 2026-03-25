@@ -15,6 +15,7 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
+use log::{info, warn};
 
 pub fn routes(state: AppState) -> Router {
     Router::new()
@@ -27,6 +28,7 @@ async fn clips_search_handler(
     State(state): State<AppState>,
     Query(params): Query<ClipSearchParams>,
 ) -> impl IntoResponse {
+    info!("received clips search request");
     match state.querier.fetch_clips_with_params(params).await {
         Ok(result) => (StatusCode::OK, Json(result)).into_response(),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
@@ -37,6 +39,7 @@ async fn clips_replay_handler(
     State(state): State<AppState>,
     Query(params): Query<ClipSearchParams>,
 ) -> impl IntoResponse {
+    info!("received clip replay request");
     match state.querier.fetch_clips_with_params(params).await {
         Ok(result) => {
             for clip_id in result {
@@ -47,8 +50,8 @@ async fn clips_replay_handler(
                     .join("data/nvidia_physical_dataset/lidar.chunk_0000")
                     .join(clip_id.clone() + ".lidar_top_360fov.parquet");
                 if !path.exists() {
-                    println!(
-                        "[warn] lidar file not found for clip {}, skipping",
+                    warn!(
+                        "lidar file not found for clip {}, skipping",
                         clip_id.clone()
                     );
                     continue;
