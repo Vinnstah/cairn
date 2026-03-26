@@ -1,8 +1,8 @@
-/// Endpoint to search for specific events or conditions within the dataset. Returns a clip_id to be used for the other endpoints.
-use std::path::PathBuf;
+//! Endpoint to search for specific events or conditions within the dataset. Returns a clip_id to be used for the other endpoints.
 
 use crate::{
     core::{
+        build_dataset_path,
         domain::model::ClipSearchParams,
         ports::{inbound::data_query::DataQuery, outbound::replay::Replay},
     },
@@ -46,8 +46,8 @@ async fn clips_replay_handler(
                 if clip_id.is_empty() {
                     continue;
                 }
-                let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("data/nvidia_physical_dataset/lidar.chunk_0000")
+                let path = build_dataset_path()
+                    .join("lidar.chunk_0000")
                     .join(clip_id.clone() + ".lidar_top_360fov.parquet");
                 if !path.exists() {
                     warn!(

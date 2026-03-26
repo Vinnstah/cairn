@@ -1,13 +1,17 @@
-use rerun::{AsComponents, Points3D, Position3D, RecordingStream, SerializedComponentBatch};
+use log::info;
+use rerun::{
+    AsComponents, Points3D, Position3D, RecordingStream, SerializedComponentBatch,
+    external::re_log::ResultExt,
+};
 
 use crate::core::{domain::model::PointCloud, ports::outbound::replay::Replay};
 
 #[async_trait::async_trait]
 impl Replay for RecordingStream {
     async fn visualize_video(&self, video: rerun::archetypes::AssetVideo) -> anyhow::Result<()> {
-        println!("replaying video");
-        // TODO handle err gracefully
-        let _ = self.log_static("video", &video);
+        info!("replaying video, {:#?}", video);
+        self.log_static("video", &video).ok_or_log_error();
+
         // Send automatically determined video frame timestamps.
         let frame_timestamps_nanos = video.read_frame_timestamps_nanos()?;
         let video_timestamps_nanos = frame_timestamps_nanos

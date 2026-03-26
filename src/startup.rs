@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub async fn start() {
-    simple_logger::SimpleLogger::new().env().init().unwrap();
+    simple_logger::init_with_level(log::Level::Info).unwrap();
     let router = axum::Router::<()>::new();
     let querier_repo = Arc::new(SessionContext::new());
     let replayer_repo = rerun::RecordingStreamBuilder::new("replayer_repo")

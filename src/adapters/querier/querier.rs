@@ -14,6 +14,7 @@ use std::{env, path::PathBuf};
 use crate::{
     adapters::querier::helpers::{build_search_query, register_with_clip_id},
     core::{
+        build_dataset_path,
         domain::model::{ClipSearchParams, DataError, PointCloud},
         ports::outbound::data_store::DataStore,
     },
@@ -41,7 +42,7 @@ impl DataStore for SessionContext {
 
     async fn register_tables(&self) -> anyhow::Result<()> {
         // The dataset is saved locally at ./data/nvidia_physical_dataset
-        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/nvidia_physical_dataset");
+        let base = build_dataset_path();
 
         for (folder, file_ext, table_name) in [
             ("egomotion.chunk_0000", ".egomotion.parquet", "ego_motion"),
