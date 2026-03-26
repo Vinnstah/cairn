@@ -35,3 +35,9 @@ impl From<Vec<[f32; 3]>> for PointCloud {
         PointCloud { points: value }
     }
 }
+
+#[derive(Clone)]
+pub struct EgoMotion {
+    pub position: [f32; 3],
+    pub rotation: [f32; 4], // qx, qy, qz, qw
+}

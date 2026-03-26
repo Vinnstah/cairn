@@ -1,24 +1,25 @@
+use datafusion::arrow::datatypes::Float64Type;
 use datafusion::{
     arrow::{
         self,
-        array::{Array, RecordBatch, StringArray},
+        array::{Array, AsArray, RecordBatch, StringArray},
     },
     error::DataFusionError,
     prelude::{ParquetReadOptions, SessionContext},
 };
 use draco_rs::prelude::ffi::draco::GeometryAttribute_Type;
 use draco_rs::prelude::{Decoder, DecoderBuffer};
-use log::info;
-use std::{env, path::PathBuf};
+use log::{info, warn};
 
 use crate::{
     adapters::querier::helpers::{build_search_query, register_with_clip_id},
     core::{
         build_dataset_path,
-        domain::model::{ClipSearchParams, DataError, PointCloud},
+        domain::model::{ClipSearchParams, DataError, EgoMotion, PointCloud},
         ports::outbound::data_store::DataStore,
     },
 };
+
 #[async_trait::async_trait]
 impl DataStore for SessionContext {
     async fn query_clips_with_params(
@@ -88,6 +89,75 @@ impl DataStore for SessionContext {
             .await
             .map_err(|e| DataError::new(e.to_string()))
     }
+
+    async fn query_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, DataError> {
+        load_ego_motion(self, clip_id)
+            .await
+            .map_err(|e| DataError::new(e.to_string()))
+    }
+}
+
+fn convert_record_batches_to_transforms(batches: Vec<RecordBatch>) -> Vec<EgoMotion> {
+    batches
+        .into_iter()
+        .flat_map(|batch| {
+            let get_f64 = |name: &str| {
+                batch
+                    .column_by_name(name)
+                    .map(|col| col.as_primitive::<Float64Type>())
+            };
+
+            let (x, y, z, qx, qy, qz, qw) = match (
+                get_f64("x"),
+                get_f64("y"),
+                get_f64("z"),
+                get_f64("qx"),
+                get_f64("qy"),
+                get_f64("qz"),
+                get_f64("qw"),
+            ) {
+                (Some(x), Some(y), Some(z), Some(qx), Some(qy), Some(qz), Some(qw)) => {
+                    (x, y, z, qx, qy, qz, qw)
+                }
+                _ => {
+                    warn!("batch missing expected columns, skipping");
+                    return vec![];
+                }
+            };
+
+            (0..batch.num_rows())
+                .map(|i| EgoMotion {
+                    position: [x.value(i) as f32, y.value(i) as f32, z.value(i) as f32],
+                    rotation: [
+                        qx.value(i) as f32,
+                        qy.value(i) as f32,
+                        qz.value(i) as f32,
+                        qw.value(i) as f32,
+                    ],
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+async fn load_ego_motion(ctx: &SessionContext, clip_id: &str) -> anyhow::Result<Vec<EgoMotion>> {
+    let path = build_dataset_path()
+        .join("egomotion.chunk_0000")
+        .join(format!("{}.egomotion.parquet", clip_id));
+
+    if !path.exists() {
+        anyhow::bail!("ego_motion file not found for clip {}", clip_id);
+    }
+    let df = ctx
+        .sql(&format!(
+            "SELECT *
+         FROM ego_motion
+         WHERE clip_id = '{clip_id}'"
+        ))
+        .await?;
+
+    let batches = df.collect().await?;
+    Ok(convert_record_batches_to_transforms(batches))
 }
 
 fn convert_record_batches_to_point_clouds(batches: Vec<RecordBatch>) -> Vec<PointCloud> {
@@ -106,10 +176,9 @@ async fn load_point_clouds(
     clip_id: &str,
     num_spins: usize,
 ) -> anyhow::Result<Vec<PointCloud>> {
-    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("data/nvidia_physical_dataset/lidar.chunk_0000");
-
-    let path = base.join(format!("{}.lidar_top_360fov.parquet", clip_id));
+    let path = build_dataset_path()
+        .join("lidar.chunk_0000")
+        .join(format!("{}.lidar_top_360fov.parquet", clip_id));
 
     if !path.exists() {
         anyhow::bail!("Lidar file not found for clip {}", clip_id);

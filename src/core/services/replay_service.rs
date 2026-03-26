@@ -1,4 +1,4 @@
-use log::{info, warn};
+use log::{error, info, warn};
 
 use crate::core::{
     domain::model::ClipSearchParams,
@@ -37,6 +37,10 @@ impl Replay for ReplayService {
                 Err(e) => {
                     warn!("skipping clip {}: {}", clip_id, e.error_msg);
                 }
+            }
+            match self.query.fetch_ego_motion(&clip_id).await {
+                Ok(ego_motion) => self.logger.replay_ego_motion(ego_motion).await?,
+                Err(err) => error!("{}", err.error_msg),
             }
         }
         Ok(())

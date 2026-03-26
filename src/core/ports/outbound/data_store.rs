@@ -1,4 +1,4 @@
-use crate::core::domain::model::{ClipSearchParams, DataError, PointCloud};
+use crate::core::domain::model::{ClipSearchParams, DataError, EgoMotion, PointCloud};
 
 #[async_trait::async_trait]
 pub trait DataStore {
@@ -12,4 +12,5 @@ pub trait DataStore {
         clip_id: &str,
         num_spins: usize,
     ) -> Result<Vec<PointCloud>, DataError>;
+    async fn query_ego_motion(&self, clip_id: &str) -> anyhow::Result<Vec<EgoMotion>, DataError>;
 }

@@ -86,7 +86,9 @@ pub fn build_search_query(params: ClipSearchParams) -> String {
         SELECT e.clip_id
         FROM ego_motion e
         GROUP BY e.clip_id
-        HAVING {where_clause}
+        HAVING e.clip_id IS NOT NULL 
+        AND e.clip_id != '' 
+        AND {where_clause}
         "#
     )
 }

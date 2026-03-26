@@ -1,10 +1,13 @@
 use log::info;
 use rerun::{
-    AsComponents, Points3D, Position3D, RecordingStream, SerializedComponentBatch,
+    AsComponents, Points3D, Position3D, RecordingStream, SerializedComponentBatch, archetypes,
     external::re_log::ResultExt,
 };
 
-use crate::core::{domain::model::PointCloud, ports::outbound::scene_logger::SceneLogger};
+use crate::core::{
+    domain::model::{EgoMotion, PointCloud},
+    ports::outbound::scene_logger::SceneLogger,
+};
 
 #[async_trait::async_trait]
 impl SceneLogger for RecordingStream {
@@ -44,7 +47,23 @@ impl SceneLogger for RecordingStream {
         Ok(())
     }
 
-    async fn replay_ego_motion(&self, ego_motion: Vec<String>) -> anyhow::Result<()> {
+    async fn replay_ego_motion(&self, ego_motion: Vec<EgoMotion>) -> anyhow::Result<()> {
+        for (i, sample) in ego_motion.iter().enumerate() {
+            self.set_time_sequence("ego_step", i as i64);
+            self.log(
+                "world/vehicle",
+                &rerun::archetypes::Transform3D::from_translation_rotation(
+                    sample.position,
+                    rerun::Quaternion::from_xyzw(sample.rotation),
+                ),
+            )?;
+        }
+        let positions: Vec<[f32; 3]> = ego_motion.iter().map(|e| e.position).collect();
+
+        self.log(
+            "world/trajectory",
+            &rerun::archetypes::LineStrips3D::new([positions]),
+        )?;
         Ok(())
     }
 }
