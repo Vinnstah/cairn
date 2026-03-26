@@ -5,11 +5,12 @@ use log::info;
 
 use crate::{
     adapters::http,
-    core::ports::{
-        data_query_service::DataQueryService,
-        inbound::data_query::DataQuery,
-        outbound::{data_store::DataStore, replay::Replay},
-        replay_service::ReplayService,
+    core::{
+        ports::{
+            inbound::{data_query::DataQuery, replay::Replay},
+            outbound::{data_store::DataStore, scene_logger::SceneLogger},
+        },
+        services::{data_query_service::DataQueryService, replay_service::ReplayService},
     },
 };
 
@@ -33,17 +34,17 @@ pub async fn start() {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub querier: DataQueryService,
-    pub replayer: ReplayService,
+    pub querier: Arc<dyn DataQuery + Send + Sync>,
+    pub replayer: Arc<dyn Replay + Send + Sync>,
 }
 
 impl AppState {
     pub fn new(
-        querier: Arc<dyn DataStore + Send + Sync>,
-        replayer: Arc<dyn Replay + Send + Sync>,
+        data_store: Arc<dyn DataStore + Send + Sync>,
+        logger: Arc<dyn SceneLogger + Send + Sync>,
     ) -> Self {
-        let data_query_service = DataQueryService::new(querier);
-        let replay_service = ReplayService::new(replayer);
+        let data_query_service = Arc::new(DataQueryService::new(data_store));
+        let replay_service = Arc::new(ReplayService::new(logger, data_query_service.clone()));
         Self {
             querier: data_query_service,
             replayer: replay_service,

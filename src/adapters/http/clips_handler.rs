@@ -1,13 +1,6 @@
 //! Endpoint to search for specific events or conditions within the dataset. Returns a clip_id to be used for the other endpoints.
 
-use crate::{
-    core::{
-        build_dataset_path,
-        domain::model::ClipSearchParams,
-        ports::{inbound::data_query::DataQuery, outbound::replay::Replay},
-    },
-    startup::AppState,
-};
+use crate::{core::domain::model::ClipSearchParams, startup::AppState};
 use axum::{
     Json, Router,
     extract::{Query, State},
@@ -15,7 +8,7 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use log::{info, warn};
+use log::info;
 
 pub fn routes(state: AppState) -> Router {
     Router::new()
@@ -40,31 +33,8 @@ async fn clips_replay_handler(
     Query(params): Query<ClipSearchParams>,
 ) -> impl IntoResponse {
     info!("received clip replay request");
-    match state.querier.fetch_clips_with_params(params).await {
-        Ok(result) => {
-            for clip_id in result {
-                if clip_id.is_empty() {
-                    continue;
-                }
-                let path = build_dataset_path()
-                    .join("lidar.chunk_0000")
-                    .join(clip_id.clone() + ".lidar_top_360fov.parquet");
-                if !path.exists() {
-                    warn!(
-                        "lidar file not found for clip {}, skipping",
-                        clip_id.clone()
-                    );
-                    continue;
-                }
-                let point_clouds = state
-                    .querier
-                    .fetch_point_clouds(&clip_id, 50)
-                    .await
-                    .expect("fetch point clouds");
-                let _ = state.replayer.replay_point_clouds(point_clouds).await;
-            }
-            (StatusCode::OK, Json("success")).into_response()
-        }
+    match state.replayer.replay_clips(params).await {
+        Ok(_) => (StatusCode::OK, Json("replaying clips in rerun")).into_response(),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
     }
 }

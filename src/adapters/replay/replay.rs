@@ -4,10 +4,10 @@ use rerun::{
     external::re_log::ResultExt,
 };
 
-use crate::core::{domain::model::PointCloud, ports::outbound::replay::Replay};
+use crate::core::{domain::model::PointCloud, ports::outbound::scene_logger::SceneLogger};
 
 #[async_trait::async_trait]
-impl Replay for RecordingStream {
+impl SceneLogger for RecordingStream {
     async fn visualize_video(&self, video: rerun::archetypes::AssetVideo) -> anyhow::Result<()> {
         info!("replaying video, {:#?}", video);
         self.log_static("video", &video).ok_or_log_error();
@@ -43,6 +43,10 @@ impl Replay for RecordingStream {
         }
         Ok(())
     }
+
+    async fn replay_ego_motion(&self, ego_motion: Vec<String>) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 impl From<PointCloud> for Points3D {
@@ -51,6 +55,7 @@ impl From<PointCloud> for Points3D {
     }
 }
 
+// Needed so that we can log PointCloud directly to Rerun
 impl AsComponents for PointCloud {
     fn as_serialized_batches(&self) -> Vec<SerializedComponentBatch> {
         let positions: Vec<Position3D> = self
