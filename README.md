@@ -53,6 +53,7 @@ cargo run
 ```bash
 # Replay clips matching driving conditions
 curl "http://localhost:3000/clips/search?min_speed=15.0&min_decel=2.5"
+```
 
 Each request queries the Parquet files via DataFusion SQL, finds matching clip UUIDs, then streams their ego motion trajectory, Draco-decoded LiDAR point clouds, and camera footage into the running Rerun viewer.
 
