@@ -25,7 +25,8 @@ pub async fn start() {
     let _ = app_state.querier.register_tables().await;
     let app = router
         .merge(http::health_handlers::routes())
-        .merge(http::clips_handler::routes(app_state.clone()));
+        .merge(http::clips_handler::routes(app_state.clone()))
+        .merge(http::schema_handler::routes(app_state.clone()));
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     info!("serving traffic on 0.0.0.0:3000");

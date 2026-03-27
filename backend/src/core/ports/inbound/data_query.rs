@@ -1,3 +1,5 @@
+use shared::ColumnInfo;
+
 use crate::core::domain::model::{ClipSearchParams, DataError, EgoMotion, PointCloud};
 
 #[async_trait::async_trait]
@@ -13,4 +15,5 @@ pub trait DataQuery: Send + Sync {
         num_spins: usize,
     ) -> Result<Vec<PointCloud>, DataError>;
     async fn fetch_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, DataError>;
+    async fn fetch_schema(&self) -> Result<Vec<ColumnInfo>, DataError>;
 }

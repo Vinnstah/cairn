@@ -10,6 +10,7 @@ use datafusion::{
 use draco_rs::prelude::ffi::draco::GeometryAttribute_Type;
 use draco_rs::prelude::{Decoder, DecoderBuffer};
 use log::{info, warn};
+use shared::ColumnInfo;
 
 use crate::{
     adapters::querier::helpers::{build_search_query, register_with_clip_id},
@@ -94,6 +95,19 @@ impl DataStore for SessionContext {
         load_ego_motion(self, clip_id)
             .await
             .map_err(|e| DataError::new(e.to_string()))
+    }
+
+    async fn query_schema(&self) -> Result<Vec<ColumnInfo>, DataError> {
+        let df = self.sql("SELECT * FROM ego_motion LIMIT 0").await?;
+        let schema = df.schema();
+        Ok(schema
+            .fields()
+            .iter()
+            .map(|f| ColumnInfo {
+                name: f.name().clone(),
+                data_type: f.data_type().to_string(),
+            })
+            .collect())
     }
 }
 

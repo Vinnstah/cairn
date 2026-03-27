@@ -1,6 +1,6 @@
 use log::info;
 use rerun::{
-    AsComponents, Points3D, Position3D, RecordingStream, SerializedComponentBatch, archetypes,
+    AsComponents, Points3D, Position3D, RecordingStream, SerializedComponentBatch,
     external::re_log::ResultExt,
 };
 

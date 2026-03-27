@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::anyhow;
-use datafusion::parquet::errors;
-use log::error;
+use shared::ColumnInfo;
 
 use crate::core::{
     domain::model::{ClipSearchParams, DataError, EgoMotion, PointCloud},
@@ -44,5 +42,9 @@ impl DataQuery for DataQueryService {
 
     async fn fetch_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, DataError> {
         self.data_store.query_ego_motion(clip_id).await
+    }
+
+    async fn fetch_schema(&self) -> Result<Vec<ColumnInfo>, DataError> {
+        self.data_store.query_schema().await
     }
 }
