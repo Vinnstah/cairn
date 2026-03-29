@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+pub mod error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColumnInfo {

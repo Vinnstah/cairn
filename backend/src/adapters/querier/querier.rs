@@ -4,19 +4,20 @@ use datafusion::{
         self,
         array::{Array, AsArray, RecordBatch, StringArray},
     },
-    error::DataFusionError,
     prelude::{ParquetReadOptions, SessionContext},
 };
 use draco_rs::prelude::ffi::draco::GeometryAttribute_Type;
 use draco_rs::prelude::{Decoder, DecoderBuffer};
 use log::{info, warn};
 use shared::ColumnInfo;
+use shared::error::CairnError;
 
+use crate::error::ServerError;
 use crate::{
     adapters::querier::helpers::{build_search_query, register_with_clip_id},
     core::{
         build_dataset_path,
-        domain::model::{ClipSearchParams, DataError, EgoMotion, PointCloud},
+        domain::model::{ClipSearchParams, EgoMotion, PointCloud},
         ports::outbound::data_store::DataStore,
     },
 };
@@ -26,17 +27,17 @@ impl DataStore for SessionContext {
     async fn query_clips_with_params(
         &self,
         params: ClipSearchParams,
-    ) -> anyhow::Result<Vec<String>> {
+    ) -> Result<Vec<String>, ServerError> {
         let df = self.sql(build_search_query(params).as_str()).await?;
         let batches = df.collect().await?;
         let mut result = vec![String::new()];
         for batch in batches {
             let clips_id = batch
                 .column_by_name("clip_id")
-                .expect("get column by name")
+                .ok_or(CairnError::MissingColumn("clip_id"))?
                 .as_any()
                 .downcast_ref::<StringArray>()
-                .expect("downcast as StringArray");
+                .ok_or(CairnError::FailedToConvertToType("StringArray".to_owned()))?;
             result.push(clips_id.value(0).to_string())
         }
         Ok(result)
@@ -85,20 +86,31 @@ impl DataStore for SessionContext {
         &self,
         clip_id: &str,
         num_spins: usize,
-    ) -> Result<Vec<PointCloud>, DataError> {
+    ) -> Result<Vec<PointCloud>, ServerError> {
         load_point_clouds(self, clip_id, num_spins)
             .await
-            .map_err(|e| DataError::new(e.to_string()))
+            .map_err(|err| {
+                CairnError::Generic {
+                    reason: err.to_string(),
+                }
+                .into()
+            })
     }
 
-    async fn query_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, DataError> {
-        load_ego_motion(self, clip_id)
+    async fn query_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, ServerError> {
+        load_ego_motion(self, clip_id).await.map_err(|err| {
+            CairnError::Generic {
+                reason: err.to_string(),
+            }
+            .into()
+        })
+    }
+
+    async fn query_schema(&self) -> Result<Vec<ColumnInfo>, ServerError> {
+        let df = self
+            .sql("SELECT * FROM ego_motion LIMIT 0")
             .await
-            .map_err(|e| DataError::new(e.to_string()))
-    }
-
-    async fn query_schema(&self) -> Result<Vec<ColumnInfo>, DataError> {
-        let df = self.sql("SELECT * FROM ego_motion LIMIT 0").await?;
+            .map_err(|err| CairnError::QueryFailed(err.to_string()))?;
         let schema = df.schema();
         Ok(schema
             .fields()
@@ -211,25 +223,19 @@ async fn load_point_clouds(
     Ok(convert_record_batches_to_point_clouds(batches))
 }
 
-impl From<DataFusionError> for DataError {
-    fn from(value: DataFusionError) -> Self {
-        DataError::new(value.message().to_string())
-    }
-}
-
 // Use newtype to get around orphan-rule.
 pub struct PointClouds(pub Vec<PointCloud>);
 
 impl TryFrom<RecordBatch> for PointClouds {
-    type Error = DataError;
+    type Error = CairnError;
 
     fn try_from(value: RecordBatch) -> Result<Self, Self::Error> {
         let draco_col = value
             .column_by_name("draco_encoded_pointcloud")
-            .ok_or_else(|| DataError::new("draco column not found".into()))?
+            .ok_or_else(|| CairnError::MissingColumn("draco_encoded_pointcloud"))?
             .as_any()
             .downcast_ref::<arrow::array::BinaryViewArray>()
-            .ok_or_else(|| DataError::new("draco column is not BinaryViewArray".into()))?;
+            .ok_or_else(|| CairnError::FailedToConvertToType("BinaryViewArray".to_owned()))?;
 
         let mut point_clouds = Vec::with_capacity(draco_col.len());
 
@@ -239,13 +245,15 @@ impl TryFrom<RecordBatch> for PointClouds {
             let mut decoder = Decoder::new();
 
             let mut pc = draco_rs::pointcloud::PointCloud::from_buffer(&mut decoder, &mut buffer)
-                .map_err(|e| {
-                DataError::new(format!("Draco decode failed at row {}: {:?}", row, e))
+                .map_err(|e| CairnError::Generic {
+                reason: format!("Draco decode failed at row {}: {:?}", row, e),
             })?;
 
             let attr_id = pc
                 .get_named_attribute_id(GeometryAttribute_Type::POSITION, 0)
-                .ok_or_else(|| DataError::new("No position attribute".into()))?;
+                .ok_or_else(|| CairnError::Generic {
+                    reason: "No position attribute".into(),
+                })?;
 
             let num_points = pc.num_points();
             let mut points = Vec::with_capacity(num_points as usize);

@@ -24,7 +24,7 @@ async fn clips_search_handler(
     info!("received clips search request");
     match state.querier.fetch_clips_with_params(params).await {
         Ok(result) => (StatusCode::OK, Json(result)).into_response(),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
+        Err(err) => err.into_response(),
     }
 }
 

@@ -1,6 +1,9 @@
 use shared::ColumnInfo;
 
-use crate::core::domain::model::{ClipSearchParams, DataError, EgoMotion, PointCloud};
+use crate::{
+    core::domain::model::{ClipSearchParams, EgoMotion, PointCloud},
+    error::ServerError,
+};
 
 #[async_trait::async_trait]
 pub trait DataStore {
@@ -8,12 +11,12 @@ pub trait DataStore {
     async fn query_clips_with_params(
         &self,
         params: ClipSearchParams,
-    ) -> anyhow::Result<Vec<String>>;
+    ) -> Result<Vec<String>, ServerError>;
     async fn query_point_clouds(
         &self,
         clip_id: &str,
         num_spins: usize,
-    ) -> Result<Vec<PointCloud>, DataError>;
-    async fn query_ego_motion(&self, clip_id: &str) -> anyhow::Result<Vec<EgoMotion>, DataError>;
-    async fn query_schema(&self) -> Result<Vec<ColumnInfo>, DataError>;
+    ) -> Result<Vec<PointCloud>, ServerError>;
+    async fn query_ego_motion(&self, clip_id: &str) -> anyhow::Result<Vec<EgoMotion>, ServerError>;
+    async fn query_schema(&self) -> Result<Vec<ColumnInfo>, ServerError>;
 }

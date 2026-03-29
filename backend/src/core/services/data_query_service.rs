@@ -2,9 +2,12 @@ use std::sync::Arc;
 
 use shared::ColumnInfo;
 
-use crate::core::{
-    domain::model::{ClipSearchParams, DataError, EgoMotion, PointCloud},
-    ports::{inbound::data_query::DataQuery, outbound::data_store::DataStore},
+use crate::{
+    core::{
+        domain::model::{ClipSearchParams, EgoMotion, PointCloud},
+        ports::{inbound::data_query::DataQuery, outbound::data_store::DataStore},
+    },
+    error::ServerError,
 };
 
 #[derive(Clone)]
@@ -27,24 +30,23 @@ impl DataQuery for DataQueryService {
     async fn fetch_clips_with_params(
         &self,
         params: ClipSearchParams,
-    ) -> anyhow::Result<Vec<String>> {
-        let result = self.data_store.query_clips_with_params(params).await;
-        Ok(result.expect("fetch clips with params"))
+    ) -> Result<Vec<String>, ServerError> {
+        self.data_store.query_clips_with_params(params).await
     }
 
     async fn fetch_point_clouds(
         &self,
         clip_id: &str,
         num_spins: usize,
-    ) -> Result<Vec<PointCloud>, DataError> {
+    ) -> Result<Vec<PointCloud>, ServerError> {
         self.data_store.query_point_clouds(clip_id, num_spins).await
     }
 
-    async fn fetch_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, DataError> {
+    async fn fetch_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, ServerError> {
         self.data_store.query_ego_motion(clip_id).await
     }
 
-    async fn fetch_schema(&self) -> Result<Vec<ColumnInfo>, DataError> {
+    async fn fetch_schema(&self) -> Result<Vec<ColumnInfo>, ServerError> {
         self.data_store.query_schema().await
     }
 }
