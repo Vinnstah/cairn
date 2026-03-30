@@ -37,12 +37,12 @@ impl Replay for ReplayService {
                     self.logger.replay_point_clouds(point_clouds).await?;
                 }
                 Err(err) => {
-                    warn!("skipping clip {}: {}", clip_id, err.0.to_string());
+                    warn!("skipping clip {}: {}", clip_id, err.0);
                 }
             }
             match self.query.fetch_ego_motion(&clip_id).await {
                 Ok(ego_motion) => self.logger.replay_ego_motion(ego_motion).await?,
-                Err(err) => error!("{}", err.0.to_string()),
+                Err(err) => error!("{}", err.0),
             }
         }
         Ok(())
