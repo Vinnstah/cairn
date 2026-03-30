@@ -1,4 +1,4 @@
-use crate::core::domain::model::ClipSearchParams;
+use shared::ClipSearchParams;
 
 #[async_trait::async_trait]
 pub trait Replay: Send + Sync {

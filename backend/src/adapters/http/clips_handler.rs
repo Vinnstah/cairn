@@ -1,19 +1,20 @@
 //! Endpoint to search for specific events or conditions within the dataset. Returns a clip_id to be used for the other endpoints.
 
-use crate::{core::domain::model::ClipSearchParams, startup::AppState};
+use crate::startup::AppState;
 use axum::{
     Json, Router,
     extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
 };
 use log::info;
+use shared::ClipSearchParams;
 
 pub fn routes(state: AppState) -> Router {
     Router::new()
         .route("/clips/search", get(clips_search_handler))
-        .route("/clips/replay", get(clips_replay_handler))
+        .route("/clips/replay", post(clips_replay_handler))
         .with_state(state)
 }
 
@@ -30,7 +31,7 @@ async fn clips_search_handler(
 
 async fn clips_replay_handler(
     State(state): State<AppState>,
-    Query(params): Query<ClipSearchParams>,
+    Json(params): Json<ClipSearchParams>,
 ) -> impl IntoResponse {
     info!("received clip replay request");
     match state.replayer.replay_clips(params).await {

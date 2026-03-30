@@ -1,11 +1,9 @@
 use log::{error, info, warn};
+use shared::ClipSearchParams;
 
-use crate::core::{
-    domain::model::ClipSearchParams,
-    ports::{
-        inbound::{data_query::DataQuery, replay::Replay},
-        outbound::scene_logger::SceneLogger,
-    },
+use crate::core::ports::{
+    inbound::{data_query::DataQuery, replay::Replay},
+    outbound::scene_logger::SceneLogger,
 };
 use std::sync::Arc;
 

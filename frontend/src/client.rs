@@ -1,4 +1,4 @@
-use shared::{ClipSearchParams, ColumnInfo};
+use shared::{ClipSearchParams, SchemaResponse};
 
 const BASE_URL: &str = "http://localhost:3000";
 
@@ -17,10 +17,10 @@ impl std::fmt::Display for ClientError {
     }
 }
 
-pub fn fetch_schema() -> Result<Vec<ColumnInfo>, ClientError> {
+pub fn fetch_schema() -> Result<SchemaResponse, ClientError> {
     reqwest::blocking::get(format!("{}/schema", BASE_URL))
         .map_err(|e| ClientError::Http(e.to_string()))?
-        .json::<Vec<ColumnInfo>>()
+        .json::<SchemaResponse>()
         .map_err(|e| ClientError::Parse(e.to_string()))
 }
 
@@ -38,8 +38,13 @@ pub fn trigger_replay(params: &ClipSearchParams) -> Result<(), ClientError> {
     } else {
         format!("{}/clips/replay?{}", BASE_URL, query.join("&"))
     };
-
-    reqwest::blocking::get(&url).map_err(|e| ClientError::Http(e.to_string()))?;
+    let client = reqwest::blocking::Client::new();
+    client
+        .post(&url)
+        .json(params)
+        .send()
+        .map_err(|e| ClientError::Http(e.to_string()))?;
+    // reqwest::blocking::get(&url).map_err(|e| ClientError::Http(e.to_string()))?;
 
     Ok(())
 }

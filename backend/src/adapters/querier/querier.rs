@@ -9,15 +9,15 @@ use datafusion::{
 use draco_rs::prelude::ffi::draco::GeometryAttribute_Type;
 use draco_rs::prelude::{Decoder, DecoderBuffer};
 use log::{info, warn};
-use shared::ColumnInfo;
 use shared::error::CairnError;
+use shared::{ClipSearchParams, ColumnInfo, SchemaResponse};
 
 use crate::error::ServerError;
 use crate::{
     adapters::querier::helpers::{build_search_query, register_with_clip_id},
     core::{
         build_dataset_path,
-        domain::model::{ClipSearchParams, EgoMotion, PointCloud},
+        domain::model::{EgoMotion, PointCloud},
         ports::outbound::data_store::DataStore,
     },
 };
@@ -55,6 +55,11 @@ impl DataStore for SessionContext {
                 "camera_timestamps",
             ),
             ("lidar.chunk_0000", ".lidar_top_360fov.parquet", "lidar"),
+            (
+                "obstacle.offline.chunk_0000",
+                ".obstacle.offline.parquet",
+                "obstacles",
+            ),
         ] {
             register_with_clip_id(self, &base.join(folder), file_ext, table_name).await?;
         }
@@ -106,20 +111,43 @@ impl DataStore for SessionContext {
         })
     }
 
-    async fn query_schema(&self) -> Result<Vec<ColumnInfo>, ServerError> {
+    async fn query_schema(&self) -> Result<SchemaResponse, ServerError> {
         let df = self
             .sql("SELECT * FROM ego_motion LIMIT 0")
             .await
             .map_err(|err| CairnError::QueryFailed(err.to_string()))?;
-        let schema = df.schema();
-        Ok(schema
+        let schema = df
+            .schema()
             .fields()
             .iter()
             .map(|f| ColumnInfo {
                 name: f.name().clone(),
                 data_type: f.data_type().to_string(),
             })
-            .collect())
+            .collect();
+
+        let df = self
+        .sql("SELECT DISTINCT label_class FROM obstacles WHERE label_class IS NOT NULL ORDER BY label_class")
+        .await?;
+
+        let batches = df.collect().await?;
+
+        let mut classes = vec![];
+        for batch in &batches {
+            let col = batch
+                .column_by_name("label_class")
+                .ok_or(CairnError::MissingColumn("label_class"))?
+                .as_any()
+                .downcast_ref::<arrow::array::StringViewArray>()
+                .ok_or(CairnError::FailedToConvertToType("StringViewArray".into()))?;
+
+            for i in 0..col.len() {
+                if !col.is_null(i) {
+                    classes.push(col.value(i).to_string());
+                }
+            }
+        }
+        Ok(SchemaResponse::new(schema, classes))
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::client::{fetch_schema, trigger_replay};
 use egui::{Color32, RichText, ScrollArea, Ui};
 use shared::{ClipSearchParams, ColumnInfo};
+use std::collections::HashSet;
 
 const NUMERIC_TYPES: &[&str] = &["Float32", "Float64", "Int32", "Int64"];
 
@@ -17,6 +18,8 @@ struct ColumnFilter {
 
 pub struct CairnApp {
     columns: Vec<ColumnInfo>,
+    label_classes: Vec<String>,
+    selected_label_classes: std::collections::HashSet<String>,
     filters: std::collections::HashMap<String, ColumnFilter>,
     schema_error: Option<String>,
     min_speed: String,
@@ -28,9 +31,13 @@ pub struct CairnApp {
 
 impl CairnApp {
     pub fn new(_cc: &eframe::CreationContext) -> Self {
-        let (columns, schema_error) = match fetch_schema() {
-            Ok(cols) => (cols, None),
-            Err(e) => (vec![], Some(format!("Could not reach backend: {}", e))),
+        let (columns, label_classes, schema_error) = match fetch_schema() {
+            Ok(schema) => (schema.column_info, schema.label_classes, None),
+            Err(e) => (
+                vec![],
+                vec![],
+                Some(format!("Could not reach backend: {}", e)),
+            ),
         };
 
         let filters = columns
@@ -40,6 +47,8 @@ impl CairnApp {
 
         Self {
             columns,
+            label_classes,
+            selected_label_classes: HashSet::new(),
             filters,
             schema_error,
             min_speed: String::new(),
@@ -60,12 +69,13 @@ impl CairnApp {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.small_button("⟳  Refresh schema").clicked() {
                     match fetch_schema() {
-                        Ok(cols) => {
-                            self.filters = cols
+                        Ok(schema) => {
+                            self.filters = schema
+                                .column_info
                                 .iter()
                                 .map(|c| (c.name.clone(), ColumnFilter::default()))
                                 .collect();
-                            self.columns = cols;
+                            self.columns = schema.column_info;
                             self.schema_error = None;
                         }
                         Err(e) => {
@@ -137,6 +147,27 @@ impl CairnApp {
             });
 
         ui.separator();
+        ui.label(RichText::new("Obstacle classes").strong().size(14.0));
+        ui.add_space(4.0);
+
+        ScrollArea::vertical()
+            .max_height(150.0)
+            .id_salt("label_scroll")
+            .show(ui, |ui| {
+                let classes = self.label_classes.clone();
+                for class in &classes {
+                    let mut selected = self.selected_label_classes.contains(class);
+                    if ui.checkbox(&mut selected, class).changed() {
+                        if selected {
+                            self.selected_label_classes.insert(class.clone());
+                        } else {
+                            self.selected_label_classes.remove(class);
+                        }
+                    }
+                }
+            });
+
+        ui.separator();
         self.replay_button(ui);
         ui.add_space(8.0);
     }
@@ -202,6 +233,7 @@ impl CairnApp {
             let params = ClipSearchParams {
                 min_speed: self.min_speed.parse::<f64>().ok(),
                 min_decel: self.min_decel.parse::<f64>().ok(),
+                label_classes: self.selected_label_classes.iter().cloned().collect(),
             };
 
             match trigger_replay(&params) {
@@ -222,7 +254,11 @@ impl CairnApp {
     fn centre_panel(&self, ui: &mut Ui) {
         let active: Vec<_> = self.filters.iter().filter(|(_, f)| f.enabled).collect();
 
-        if active.is_empty() && self.min_speed.is_empty() && self.min_decel.is_empty() {
+        if active.is_empty()
+            && self.min_speed.is_empty()
+            && self.min_decel.is_empty()
+            && self.selected_label_classes.is_empty()
+        {
             ui.centered_and_justified(|ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(80.0);
@@ -285,6 +321,15 @@ impl CairnApp {
                     ui.label(RichText::new(parts).monospace());
                 }
                 ui.add_space(8.0);
+                if !self.selected_label_classes.is_empty() {
+                    let classes = self
+                        .selected_label_classes
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    ui.label(RichText::new(format!("obstacles  ∈  [{}]", classes)).monospace());
+                }
             });
 
             ui.add_space(24.0);

@@ -1,9 +1,3 @@
-#[derive(serde::Deserialize)]
-pub struct ClipSearchParams {
-    pub min_decel: Option<f64>,
-    pub min_speed: Option<f64>,
-}
-
 #[derive(Clone)]
 pub struct PointCloud {
     pub points: Vec<[f32; 3]>,

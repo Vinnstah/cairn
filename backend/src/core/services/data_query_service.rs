@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
-use shared::ColumnInfo;
-
 use crate::{
     core::{
-        domain::model::{ClipSearchParams, EgoMotion, PointCloud},
+        domain::model::{EgoMotion, PointCloud},
         ports::{inbound::data_query::DataQuery, outbound::data_store::DataStore},
     },
     error::ServerError,
 };
+use shared::{ClipSearchParams, SchemaResponse};
 
 #[derive(Clone)]
 pub struct DataQueryService {
@@ -46,7 +45,7 @@ impl DataQuery for DataQueryService {
         self.data_store.query_ego_motion(clip_id).await
     }
 
-    async fn fetch_schema(&self) -> Result<Vec<ColumnInfo>, ServerError> {
+    async fn fetch_schema(&self) -> Result<SchemaResponse, ServerError> {
         self.data_store.query_schema().await
     }
 }

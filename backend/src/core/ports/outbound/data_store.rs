@@ -1,7 +1,7 @@
-use shared::ColumnInfo;
+use shared::{ClipSearchParams, SchemaResponse};
 
 use crate::{
-    core::domain::model::{ClipSearchParams, EgoMotion, PointCloud},
+    core::domain::model::{EgoMotion, PointCloud},
     error::ServerError,
 };
 
@@ -18,5 +18,5 @@ pub trait DataStore {
         num_spins: usize,
     ) -> Result<Vec<PointCloud>, ServerError>;
     async fn query_ego_motion(&self, clip_id: &str) -> anyhow::Result<Vec<EgoMotion>, ServerError>;
-    async fn query_schema(&self) -> Result<Vec<ColumnInfo>, ServerError>;
+    async fn query_schema(&self) -> Result<SchemaResponse, ServerError>;
 }

@@ -2,8 +2,7 @@ use std::path::Path;
 
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
 use log::info;
-
-use crate::core::domain::model::ClipSearchParams;
+use shared::ClipSearchParams;
 
 pub async fn register_with_clip_id(
     ctx: &SessionContext,
@@ -61,34 +60,43 @@ pub async fn register_with_clip_id(
 }
 
 pub fn build_search_query(params: ClipSearchParams) -> String {
-    let mut wheres: Vec<String> = vec![];
+    let mut having = vec![];
 
-    if let Some(min_speed) = params.min_speed {
-        wheres.push(format!(
-            "AVG(SQRT(e.vx * e.vx + e.vy * e.vy)) > {min_speed}"
-        ));
+    if let Some(v) = params.min_speed {
+        having.push(format!("AVG(SQRT(e.vx * e.vx + e.vy * e.vy)) > {v}"));
+    }
+    if let Some(v) = params.min_decel {
+        having.push(format!("AVG(SQRT(e.ax * e.ax + e.ay * e.ay)) > {v}"));
     }
 
-    if let Some(min_decel) = params.min_decel {
-        wheres.push(format!(
-            "AVG(SQRT(e.ax * e.ax + e.ay * e.ay)) > {min_decel}"
-        ));
-    }
-
-    let where_clause = if wheres.is_empty() {
-        "1=1".to_owned()
+    let having_clause = if having.is_empty() {
+        "1=1".into()
     } else {
-        wheres.join(" AND ")
+        having.join(" AND ")
     };
 
-    format!(
-        r#"
-        SELECT e.clip_id
-        FROM ego_motion e
-        GROUP BY e.clip_id
-        HAVING e.clip_id IS NOT NULL 
-        AND e.clip_id != '' 
-        AND {where_clause}
-        "#
-    )
+    if params.label_classes.is_empty() {
+        format!(
+            "SELECT e.clip_id
+             FROM ego_motion e
+             GROUP BY e.clip_id
+             HAVING {having_clause}"
+        )
+    } else {
+        let class_list = params
+            .label_classes
+            .iter()
+            .map(|c| format!("'{c}'"))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        format!(
+            "SELECT DISTINCT e.clip_id
+             FROM ego_motion e
+             JOIN obstacles o ON e.clip_id = o.clip_id
+             WHERE o.label_class IN ({class_list})
+             GROUP BY e.clip_id
+             HAVING {having_clause}"
+        )
+    }
 }
