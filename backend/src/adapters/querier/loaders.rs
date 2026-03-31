@@ -6,6 +6,7 @@ use datafusion::{
     prelude::{ParquetReadOptions, SessionContext},
 };
 use log::{info, warn};
+use shared::error::CairnError;
 
 use crate::{
     adapters::querier::session_context::PointClouds,
@@ -13,6 +14,7 @@ use crate::{
         build_dataset_path,
         domain::model::{EgoMotion, PointCloud},
     },
+    error::ServerError,
 };
 
 fn convert_record_batches_to_transforms(batches: Vec<RecordBatch>) -> Vec<EgoMotion> {
@@ -60,13 +62,13 @@ fn convert_record_batches_to_transforms(batches: Vec<RecordBatch>) -> Vec<EgoMot
 pub async fn load_ego_motion(
     ctx: &SessionContext,
     clip_id: &str,
-) -> anyhow::Result<Vec<EgoMotion>> {
+) -> Result<Vec<EgoMotion>, ServerError> {
     let path = build_dataset_path()
         .join("egomotion.chunk_0000")
         .join(format!("{}.egomotion.parquet", clip_id));
 
     if !path.exists() {
-        anyhow::bail!("ego_motion file not found for clip {}", clip_id);
+        return Err(CairnError::ClipNotFound(clip_id.to_owned()).into());
     }
     let df = ctx
         .sql(&format!(
@@ -95,7 +97,7 @@ pub async fn load_point_clouds(
     ctx: &SessionContext,
     clip_id: &str,
     num_spins: usize,
-) -> anyhow::Result<Vec<PointCloud>> {
+) -> Result<Vec<PointCloud>, ServerError> {
     info!("load_point_clouds start for clip {}", clip_id);
 
     let path = build_dataset_path()

@@ -7,7 +7,7 @@ use crate::{
 
 #[async_trait::async_trait]
 pub trait DataQuery: Send + Sync {
-    async fn register_tables(&self) -> anyhow::Result<()>;
+    async fn register_tables(&self) -> Result<(), ServerError>;
     async fn fetch_clips_with_params(
         &self,
         params: ClipSearchParams,

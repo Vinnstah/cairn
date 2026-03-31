@@ -2,17 +2,22 @@ use std::path::Path;
 
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
 use log::info;
-use shared::ClipSearchParams;
+use shared::{ClipSearchParams, error::CairnError};
+
+use crate::error::ServerError;
 
 pub async fn register_with_clip_id(
     ctx: &SessionContext,
     dir: &Path,
     file_suffix: &str, // e.g. ".egomotion.parquet"
     table_name: &str,
-) -> anyhow::Result<()> {
+) -> Result<(), ServerError> {
     let mut views = vec![];
 
-    let mut entries: Vec<_> = std::fs::read_dir(dir)?
+    let mut entries: Vec<_> = std::fs::read_dir(dir)
+        .map_err(|err| CairnError::Generic {
+            reason: err.to_string(),
+        })?
         .filter_map(|e| e.ok())
         .filter(|e| {
             e.file_name()
@@ -41,11 +46,14 @@ pub async fn register_with_clip_id(
     }
 
     if views.is_empty() {
-        anyhow::bail!(
-            "No files found in {} with suffix {}",
-            dir.display(),
-            file_suffix
-        );
+        return Err(CairnError::Generic {
+            reason: format!(
+                "No files found in {} with suffix {}",
+                dir.display(),
+                file_suffix
+            ),
+        }
+        .into());
     }
 
     let sql = format!(
@@ -107,5 +115,5 @@ pub fn build_search_query(params: ClipSearchParams) -> String {
          HAVING {having_clause}
          LIMIT 10"
         )
-    } 
+    }
 }

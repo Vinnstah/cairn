@@ -53,7 +53,7 @@ impl DataStore for SessionContext {
         Ok(result)
     }
 
-    async fn register_tables(&self) -> anyhow::Result<()> {
+    async fn register_tables(&self) -> Result<(), ServerError> {
         // The dataset is saved locally at ./data/nvidia_physical_dataset
         let base = build_dataset_path();
 
@@ -103,24 +103,12 @@ impl DataStore for SessionContext {
         num_spins: usize,
     ) -> Result<Vec<PointCloud>, ServerError> {
         info!("query point clouds");
-        load_point_clouds(self, clip_id, num_spins)
-            .await
-            .map_err(|err| {
-                CairnError::Generic {
-                    reason: err.to_string(),
-                }
-                .into()
-            })
+        load_point_clouds(self, clip_id, num_spins).await
     }
 
     async fn query_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, ServerError> {
         info!("query ego motion");
-        load_ego_motion(self, clip_id).await.map_err(|err| {
-            CairnError::Generic {
-                reason: err.to_string(),
-            }
-            .into()
-        })
+        load_ego_motion(self, clip_id).await
     }
 
     async fn query_schema(&self) -> Result<SchemaResponse, ServerError> {

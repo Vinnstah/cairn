@@ -1837,7 +1837,6 @@ dependencies = [
 name = "cairn"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "arrow 58.0.0",
  "async-trait",
  "axum",

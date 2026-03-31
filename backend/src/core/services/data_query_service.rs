@@ -22,7 +22,7 @@ impl DataQueryService {
 
 #[async_trait::async_trait]
 impl DataQuery for DataQueryService {
-    async fn register_tables(&self) -> anyhow::Result<()> {
+    async fn register_tables(&self) -> Result<(), ServerError> {
         self.data_store.register_tables().await
     }
 
