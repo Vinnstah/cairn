@@ -5,8 +5,10 @@ use crate::{
     error::ServerError,
 };
 
+/// Responsible for connecting the incoming request to the outbound data-store.
 #[async_trait::async_trait]
 pub trait DataQuery: Send + Sync {
+    /// Registering the local files as queryable tables.
     async fn register_tables(&self) -> Result<(), ServerError>;
     async fn fetch_clips_with_params(
         &self,

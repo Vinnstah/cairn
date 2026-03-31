@@ -92,7 +92,6 @@ impl DataStore for SessionContext {
         )
         .await?;
 
-        // TODO: Register all folders as tables
         info!("Registered parquets from {}", base.display());
         Ok(())
     }
@@ -126,6 +125,7 @@ impl DataStore for SessionContext {
             })
             .collect();
 
+        // Fetch all unique label_classes from the dataset
         let df = self
         .sql("SELECT DISTINCT label_class FROM obstacles WHERE label_class IS NOT NULL ORDER BY label_class")
         .await?;

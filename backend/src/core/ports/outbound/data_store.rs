@@ -5,6 +5,7 @@ use crate::{
     error::ServerError,
 };
 
+/// Responsible of connecting to a data-store and querying the underlying data
 #[async_trait::async_trait]
 pub trait DataStore {
     async fn register_tables(&self) -> Result<(), ServerError>;

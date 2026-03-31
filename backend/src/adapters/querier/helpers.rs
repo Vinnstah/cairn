@@ -6,6 +6,8 @@ use shared::{ClipSearchParams, error::CairnError};
 
 use crate::error::ServerError;
 
+/// Register a folder of parquet-files as a new table unioning the clip_id into the table.
+/// This is needed since the file-schema laccks clip_id but the file-name contains it.
 pub async fn register_with_clip_id(
     ctx: &SessionContext,
     dir: &Path,

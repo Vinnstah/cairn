@@ -15,10 +15,7 @@ use crate::{
 
 #[async_trait::async_trait]
 impl SceneLogger for RecordingStream {
-    async fn visualize_video(
-        &self,
-        video: rerun::archetypes::AssetVideo,
-    ) -> Result<(), ServerError> {
+    async fn replay_video(&self, video: rerun::archetypes::AssetVideo) -> Result<(), ServerError> {
         info!("replaying video, {:#?}", video);
         self.log_static("video", &video).ok_or_log_error();
 
@@ -49,10 +46,7 @@ impl SceneLogger for RecordingStream {
                 .map_err(|err| CairnError::Generic {
                     reason: err.to_string(),
                 })?,
-        )
-        .map_err(|err| CairnError::Generic {
-            reason: err.to_string(),
-        })?;
+        )?;
 
         Ok(())
     }
@@ -63,10 +57,7 @@ impl SceneLogger for RecordingStream {
                 "ego_time",
                 pc.spin_start_timestamp as f64 / 1_000_000.0,
             );
-            self.log("world/lidar", pc)
-                .map_err(|err| CairnError::Generic {
-                    reason: err.to_string(),
-                })?;
+            self.log("world/lidar", pc)?;
         }
         Ok(())
     }
@@ -80,20 +71,14 @@ impl SceneLogger for RecordingStream {
                     sample.position,
                     rerun::Quaternion::from_xyzw(sample.rotation),
                 ),
-            )
-            .map_err(|err| CairnError::Generic {
-                reason: err.to_string(),
-            })?;
+            )?;
         }
         let positions: Vec<[f32; 3]> = ego_motion.iter().map(|e| e.position).collect();
 
         self.log(
             "world/trajectory",
             &rerun::archetypes::LineStrips3D::new([positions]),
-        )
-        .map_err(|err| CairnError::Generic {
-            reason: err.to_string(),
-        })?;
+        )?;
         Ok(())
     }
 
@@ -127,10 +112,7 @@ impl SceneLogger for RecordingStream {
                 &rerun::archetypes::Boxes3D::from_centers_and_sizes(centers, sizes)
                     .with_quaternions(rotations)
                     .with_labels(labels),
-            )
-            .map_err(|err| CairnError::Generic {
-                reason: err.to_string(),
-            })?;
+            )?;
         }
 
         Ok(())

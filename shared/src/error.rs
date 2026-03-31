@@ -22,4 +22,7 @@ pub enum CairnError {
 
     #[error("Generic error: {reason}")]
     Generic { reason: String },
+
+    #[error("Streaming error: {reason}")]
+    StreamingError { reason: String },
 }

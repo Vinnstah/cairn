@@ -3,9 +3,10 @@ use crate::{
     error::ServerError,
 };
 
+/// Trait that handles replaying into external replay-platform
 #[async_trait::async_trait]
 pub trait SceneLogger {
-    async fn visualize_video(
+    async fn replay_video(
         &self,
         video: rerun::archetypes::AssetVideo,
     ) -> Result<(), ServerError>;

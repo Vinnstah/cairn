@@ -27,6 +27,7 @@ impl ReplayService {
 
 #[async_trait::async_trait]
 impl Replay for ReplayService {
+    /// Load and replay clips in Rerun
     async fn replay_clips(&self, params: ClipSearchParams) -> Result<(), ServerError> {
         let clip_ids = self
             .query
@@ -51,7 +52,7 @@ impl Replay for ReplayService {
             self.logger.replay_point_clouds(point_clouds).await?;
             self.logger.replay_bounding_boxes(bounding_boxes).await?;
 
-            info!("done replaying clip {}", clip_id);
+            info!("done loading clip for replaying {}", clip_id);
         }
         Ok(())
     }
