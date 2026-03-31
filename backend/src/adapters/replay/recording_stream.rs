@@ -83,36 +83,52 @@ impl SceneLogger for RecordingStream {
     }
 
     async fn replay_bounding_boxes(&self, boxes: Vec<BoundingBox>) -> Result<(), ServerError> {
-        // Group by timestamp so each frame logs all boxes together
-        let mut by_timestamp: std::collections::BTreeMap<i64, Vec<&BoundingBox>> =
-            std::collections::BTreeMap::new();
+        // Group by track_id
+        let mut by_track: std::collections::HashMap<String, Vec<&BoundingBox>> =
+            std::collections::HashMap::new();
+
         for b in &boxes {
-            by_timestamp.entry(b.timestamp_us).or_default().push(b);
+            let short_id: String = b.track_id.chars().take(8).collect();
+            let key = format!("{}/{}", b.label_class, short_id);
+            by_track.entry(key).or_default().push(b);
         }
 
-        for (ts, frame_boxes) in &by_timestamp {
-            self.set_timestamp_secs_since_epoch("ego_time", *ts as f64 / 1_000_000.0);
+        for (track_key, track_boxes) in &by_track {
+            let entity_path = format!("world/obstacles/{}", track_key);
 
-            let centers: Vec<[f32; 3]> = frame_boxes.iter().map(|b| b.center).collect();
-            let sizes: Vec<[f32; 3]> = frame_boxes.iter().map(|b| b.size).collect();
-            let rotations: Vec<rerun::Quaternion> = frame_boxes
-                .iter()
-                .map(|b| rerun::Quaternion::from_xyzw(b.rotation))
-                .collect();
-            let labels: Vec<rerun::components::Text> = frame_boxes
-                .iter()
-                .map(|b| {
-                    let short_id: String = b.track_id.chars().take(8).collect();
-                    rerun::components::Text::from(format!("{} ({})", b.label_class, short_id,))
-                })
-                .collect();
+            // Sort by time
+            let mut sorted = track_boxes.to_vec();
+            sorted.sort_by_key(|b| b.timestamp_us);
 
-            self.log(
-                "world/obstacles",
-                &rerun::archetypes::Boxes3D::from_centers_and_sizes(centers, sizes)
-                    .with_quaternions(rotations)
-                    .with_labels(labels),
-            )?;
+            for (i, b) in sorted.iter().enumerate() {
+                // Each box is visible until the next box for this track arrives
+                // For the last box, keep it visible for one extra interval
+                let next_ts = sorted
+                    .get(i + 1)
+                    .map(|next| next.timestamp_us)
+                    .unwrap_or(b.timestamp_us + 100_000); // 100ms falloff
+
+                // Log box at its timestamp
+                self.set_timestamp_secs_since_epoch(
+                    "ego_time",
+                    b.timestamp_us as f64 / 1_000_000.0,
+                );
+                self.log(
+                    entity_path.as_str(),
+                    &rerun::archetypes::Boxes3D::from_centers_and_sizes([b.center], [b.size])
+                        .with_quaternions([rerun::Quaternion::from_xyzw(b.rotation)])
+                        .with_labels([format!(
+                            "{} ({})",
+                            b.label_class,
+                            track_key.split('/').last().unwrap_or("")
+                        )]),
+                )?;
+
+                // Log a clear just before the next box arrives so it doesn't
+                // persist beyond its valid window
+                self.set_timestamp_secs_since_epoch("ego_time", (next_ts - 1) as f64 / 1_000_000.0);
+                self.log(entity_path.as_str(), &rerun::archetypes::Clear::flat())?;
+            }
         }
 
         Ok(())
