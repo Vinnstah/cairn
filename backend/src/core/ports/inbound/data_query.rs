@@ -1,7 +1,7 @@
 use shared::{ClipSearchParams, SchemaResponse};
 
 use crate::{
-    core::domain::model::{EgoMotion, PointCloud},
+    core::domain::model::{BoundingBox, EgoMotion, PointCloud},
     error::ServerError,
 };
 
@@ -19,4 +19,5 @@ pub trait DataQuery: Send + Sync {
     ) -> Result<Vec<PointCloud>, ServerError>;
     async fn fetch_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, ServerError>;
     async fn fetch_schema(&self) -> Result<SchemaResponse, ServerError>;
+    async fn fetch_bounding_boxes(&self, clip_id: &str) -> Result<Vec<BoundingBox>, ServerError>;
 }

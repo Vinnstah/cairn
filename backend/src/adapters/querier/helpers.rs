@@ -60,6 +60,7 @@ pub async fn register_with_clip_id(
 }
 
 pub fn build_search_query(params: ClipSearchParams) -> String {
+    info!("build search query");
     let mut having = vec![];
 
     if let Some(v) = params.min_speed {
@@ -78,9 +79,11 @@ pub fn build_search_query(params: ClipSearchParams) -> String {
     if params.label_classes.is_empty() {
         format!(
             "SELECT e.clip_id
-             FROM ego_motion e
-             GROUP BY e.clip_id
-             HAVING {having_clause}"
+         FROM ego_motion e
+         WHERE e.clip_id IN (SELECT DISTINCT clip_id FROM lidar)
+         GROUP BY e.clip_id
+         HAVING {having_clause}
+         LIMIT 10"
         )
     } else {
         let class_list = params
@@ -90,13 +93,19 @@ pub fn build_search_query(params: ClipSearchParams) -> String {
             .collect::<Vec<_>>()
             .join(", ");
 
+        let class_count = params.label_classes.len();
+
         format!(
-            "SELECT DISTINCT e.clip_id
-             FROM ego_motion e
-             JOIN obstacles o ON e.clip_id = o.clip_id
-             WHERE o.label_class IN ({class_list})
-             GROUP BY e.clip_id
-             HAVING {having_clause}"
+            "SELECT e.clip_id
+         FROM ego_motion e
+         WHERE e.clip_id IN (SELECT DISTINCT clip_id FROM lidar)
+           AND e.clip_id IN (SELECT DISTINCT clip_id FROM obstacles
+                             WHERE label_class IN ({class_list})
+                             GROUP BY clip_id
+                             HAVING COUNT(DISTINCT label_class) = {class_count})
+         GROUP BY e.clip_id
+         HAVING {having_clause}
+         LIMIT 10"
         )
-    }
+    } 
 }

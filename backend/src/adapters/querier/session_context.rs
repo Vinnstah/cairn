@@ -1,7 +1,7 @@
 use datafusion::{
     arrow::{
         self,
-        array::{Array, RecordBatch, StringArray},
+        array::{Array, AsArray, RecordBatch, StringArray},
     },
     prelude::{ParquetReadOptions, SessionContext},
 };
@@ -15,7 +15,7 @@ use crate::{
     adapters::querier::helpers::{build_search_query, register_with_clip_id},
     core::{
         build_dataset_path,
-        domain::model::{EgoMotion, PointCloud},
+        domain::model::{BoundingBox, EgoMotion, PointCloud},
         ports::outbound::data_store::DataStore,
     },
 };
@@ -30,9 +30,17 @@ impl DataStore for SessionContext {
         &self,
         params: ClipSearchParams,
     ) -> Result<Vec<String>, ServerError> {
-        let df = self.sql(build_search_query(params).as_str()).await?;
+        info!("query clips with params");
+        let df = self
+            .sql(build_search_query(params.clone()).as_str())
+            .await?;
         let batches = df.collect().await?;
-        let mut result = vec![String::new()];
+        if batches.len() == 0 {
+            return Err(ServerError(CairnError::Generic {
+                reason: format!("No clips found with params, {:#?}", params),
+            }));
+        }
+        let mut result = vec![];
         for batch in batches {
             let clips_id = batch
                 .column_by_name("clip_id")
@@ -94,6 +102,7 @@ impl DataStore for SessionContext {
         clip_id: &str,
         num_spins: usize,
     ) -> Result<Vec<PointCloud>, ServerError> {
+        info!("query point clouds");
         load_point_clouds(self, clip_id, num_spins)
             .await
             .map_err(|err| {
@@ -105,6 +114,7 @@ impl DataStore for SessionContext {
     }
 
     async fn query_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, ServerError> {
+        info!("query ego motion");
         load_ego_motion(self, clip_id).await.map_err(|err| {
             CairnError::Generic {
                 reason: err.to_string(),
@@ -150,6 +160,110 @@ impl DataStore for SessionContext {
             }
         }
         Ok(SchemaResponse::new(schema, classes))
+    }
+
+    async fn query_bounding_boxes(&self, clip_id: &str) -> Result<Vec<BoundingBox>, ServerError> {
+        info!("query bounding boxes for clip {}", clip_id);
+
+        let df = self
+            .sql(&format!(
+                "SELECT
+            track_id,
+            label_class,
+            CAST(timestamp_us AS BIGINT) AS timestamp_us,
+            center_x, center_y, center_z,
+            size_x,   size_y,   size_z,
+            orientation_x, orientation_y,
+            orientation_z, orientation_w
+         FROM obstacles
+         WHERE clip_id = '{clip_id}'
+           AND label_class IS NOT NULL
+         ORDER BY timestamp_us"
+            ))
+            .await?;
+
+        info!("bounding boxes sql executed for clip {}", clip_id);
+        let batches = df.collect().await?;
+        info!("collected {} bounding box batches", batches.len());
+        let mut boxes = vec![];
+        if batches.len() > 0 {
+            info!("found bounding boxes");
+        }
+        for batch in &batches {
+            let get_f64 = |name: &str| {
+                batch
+                    .column_by_name(name)
+                    .map(|c| c.as_primitive::<datafusion::arrow::datatypes::Float64Type>())
+            };
+            let get_str = |name: &str| {
+                batch
+                    .column_by_name(name)
+                    .and_then(|c| c.as_any().downcast_ref::<arrow::array::StringViewArray>())
+            };
+            let get_i64 = |name: &str| {
+                batch
+                    .column_by_name(name)
+                    .map(|c| c.as_primitive::<datafusion::arrow::datatypes::Int64Type>())
+            };
+
+            let (cx, cy, cz) = match (
+                get_f64("center_x"),
+                get_f64("center_y"),
+                get_f64("center_z"),
+            ) {
+                (Some(x), Some(y), Some(z)) => (x, y, z),
+                _ => continue,
+            };
+            let (sx, sy, sz) = match (get_f64("size_x"), get_f64("size_y"), get_f64("size_z")) {
+                (Some(x), Some(y), Some(z)) => (x, y, z),
+                _ => continue,
+            };
+            let (ox, oy, oz, ow) = match (
+                get_f64("orientation_x"),
+                get_f64("orientation_y"),
+                get_f64("orientation_z"),
+                get_f64("orientation_w"),
+            ) {
+                (Some(x), Some(y), Some(z), Some(w)) => (x, y, z, w),
+                _ => continue,
+            };
+
+            let track_ids = get_str("track_id");
+            let label_classes = get_str("label_class");
+            let timestamps = get_i64("timestamp_us");
+
+            for i in 0..batch.num_rows() {
+                boxes.push(BoundingBox {
+                    track_id: track_ids
+                        .map(|a| a.value(i).to_string())
+                        .unwrap_or_default(),
+                    label_class: label_classes
+                        .map(|a| a.value(i).to_string())
+                        .unwrap_or_default(),
+                    timestamp_us: timestamps.map(|a| a.value(i)).unwrap_or(0),
+                    center: [cx.value(i) as f32, cy.value(i) as f32, cz.value(i) as f32],
+                    size: [sx.value(i) as f32, sy.value(i) as f32, sz.value(i) as f32],
+                    rotation: [
+                        ox.value(i) as f32,
+                        oy.value(i) as f32,
+                        oz.value(i) as f32,
+                        ow.value(i) as f32,
+                    ],
+                });
+            }
+        }
+        info!(
+            "bounding boxes span {} distinct timestamps",
+            boxes
+                .iter()
+                .map(|b| b.timestamp_us)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+        );
+        if let Some(first) = boxes.first() {
+            info!("first bbox timestamp_us: {}", first.timestamp_us);
+        }
+        Ok(boxes)
     }
 }
 

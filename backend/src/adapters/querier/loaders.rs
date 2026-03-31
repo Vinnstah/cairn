@@ -3,9 +3,9 @@ use datafusion::{
         array::{AsArray, RecordBatch},
         datatypes::Float64Type,
     },
-    prelude::SessionContext,
+    prelude::{ParquetReadOptions, SessionContext},
 };
-use log::warn;
+use log::{info, warn};
 
 use crate::{
     adapters::querier::session_context::PointClouds,
@@ -24,7 +24,6 @@ fn convert_record_batches_to_transforms(batches: Vec<RecordBatch>) -> Vec<EgoMot
                     .column_by_name(name)
                     .map(|col| col.as_primitive::<Float64Type>())
             };
-
             let (x, y, z, qx, qy, qz, qw) = match (
                 get_f64("x"),
                 get_f64("y"),
@@ -97,23 +96,52 @@ pub async fn load_point_clouds(
     clip_id: &str,
     num_spins: usize,
 ) -> anyhow::Result<Vec<PointCloud>> {
+    info!("load_point_clouds start for clip {}", clip_id);
+
     let path = build_dataset_path()
         .join("lidar.chunk_0000")
         .join(format!("{}.lidar_top_360fov.parquet", clip_id));
 
     if !path.exists() {
-        anyhow::bail!("Lidar file not found for clip {}", clip_id);
+        warn!("lidar file not found for clip {}, skipping", clip_id);
+        return Ok(vec![]);
     }
+
+    // Register just this clip's file as a temp table
+    let table_name = format!("lidar_clip_{}", &clip_id[..8]);
+    ctx.register_parquet(
+        &table_name,
+        path.to_str().unwrap(),
+        ParquetReadOptions::default(),
+    )
+    .await?;
 
     let df = ctx
         .sql(&format!(
             "SELECT draco_encoded_pointcloud
-         FROM lidar
-         WHERE clip_id = '{clip_id}'
-         AND spin_index <= {num_spins}",
+             FROM {table_name}
+             WHERE spin_index <= {num_spins}",
         ))
         .await?;
 
+    info!("sql executed for clip {}", clip_id);
     let batches = df.collect().await?;
-    Ok(convert_record_batches_to_point_clouds(batches))
+    info!("collected {} batches for clip {}", batches.len(), clip_id);
+
+    // Deregister to avoid collision on next call
+    ctx.deregister_table(&table_name)?;
+
+    if batches.is_empty() {
+        warn!("no lidar data found for clip {}", clip_id);
+        return Ok(vec![]);
+    }
+
+    let point_clouds = convert_record_batches_to_point_clouds(batches);
+    info!(
+        "decoded {} point clouds for clip {}",
+        point_clouds.len(),
+        clip_id
+    );
+
+    Ok(point_clouds)
 }

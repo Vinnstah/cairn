@@ -24,3 +24,13 @@ pub struct EgoMotion {
     pub position: [f32; 3],
     pub rotation: [f32; 4], // qx, qy, qz, qw
 }
+
+#[derive(Clone)]
+pub struct BoundingBox {
+    pub track_id: String,
+    pub label_class: String,
+    pub timestamp_us: i64,
+    pub center: [f32; 3],
+    pub size: [f32; 3],
+    pub rotation: [f32; 4], // qx, qy, qz, qw
+}

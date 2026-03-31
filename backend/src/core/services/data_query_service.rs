@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     core::{
-        domain::model::{EgoMotion, PointCloud},
+        domain::model::{BoundingBox, EgoMotion, PointCloud},
         ports::{inbound::data_query::DataQuery, outbound::data_store::DataStore},
     },
     error::ServerError,
@@ -47,5 +47,9 @@ impl DataQuery for DataQueryService {
 
     async fn fetch_schema(&self) -> Result<SchemaResponse, ServerError> {
         self.data_store.query_schema().await
+    }
+
+    async fn fetch_bounding_boxes(&self, clip_id: &str) -> Result<Vec<BoundingBox>, ServerError> {
+        self.data_store.query_bounding_boxes(clip_id).await
     }
 }

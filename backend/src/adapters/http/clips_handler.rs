@@ -33,9 +33,9 @@ async fn clips_replay_handler(
     State(state): State<AppState>,
     Json(params): Json<ClipSearchParams>,
 ) -> impl IntoResponse {
-    info!("received clip replay request");
+    info!("received clip replay request: {:#?}", params);
     match state.replayer.replay_clips(params).await {
         Ok(_) => (StatusCode::OK, Json("replaying clips in rerun")).into_response(),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
+        Err(err) => err.into_response(),
     }
 }
