@@ -44,7 +44,6 @@ pub fn trigger_replay(params: &ClipSearchParams) -> Result<(), ClientError> {
         .json(params)
         .send()
         .map_err(|e| ClientError::Http(e.to_string()))?;
-    // reqwest::blocking::get(&url).map_err(|e| ClientError::Http(e.to_string()))?;
 
     Ok(())
 }
