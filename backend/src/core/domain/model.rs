@@ -1,6 +1,7 @@
 #[derive(Clone)]
 pub struct PointCloud {
     pub points: Vec<[f32; 3]>,
+    pub spin_start_timestamp: i64, // relative microseconds, same scale as ego/obstacles
 }
 
 impl IntoIterator for PointCloud {
@@ -15,7 +16,10 @@ impl IntoIterator for PointCloud {
 
 impl From<Vec<[f32; 3]>> for PointCloud {
     fn from(value: Vec<[f32; 3]>) -> Self {
-        PointCloud { points: value }
+        PointCloud {
+            points: value,
+            spin_start_timestamp: 0,
+        }
     }
 }
 

@@ -272,6 +272,10 @@ impl TryFrom<RecordBatch> for PointClouds {
             ))?;
 
         let mut point_clouds = Vec::with_capacity(draco_col.len());
+        let ts_col = value
+            .column_by_name("spin_start_timestamp")
+            .ok_or_else(|| CairnError::MissingColumn("spin_start_timestamp"))?
+            .as_primitive::<datafusion::arrow::datatypes::Int64Type>();
 
         for row in 0..draco_col.len() {
             let draco_bytes = draco_col.value(row);
@@ -295,7 +299,10 @@ impl TryFrom<RecordBatch> for PointClouds {
                 points.push(pc.get_point_alloc::<f32, 3>(attr_id, i));
             }
 
-            point_clouds.push(PointCloud { points });
+            point_clouds.push(PointCloud {
+                points,
+                spin_start_timestamp: ts_col.value(row),
+            });
         }
 
         Ok(PointClouds(point_clouds))

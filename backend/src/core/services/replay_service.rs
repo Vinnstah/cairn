@@ -38,7 +38,7 @@ impl Replay for ReplayService {
         for clip_id in clip_ids {
             info!("replaying clip {}", clip_id);
 
-            let point_clouds = self.query.fetch_point_clouds(&clip_id, 100).await?;
+            let point_clouds = self.query.fetch_point_clouds(&clip_id, 200).await?;
             info!("fetched {} point clouds", point_clouds.len());
 
             let ego_motion = self.query.fetch_ego_motion(&clip_id).await?;

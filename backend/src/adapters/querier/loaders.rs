@@ -120,9 +120,9 @@ pub async fn load_point_clouds(
 
     let df = ctx
         .sql(&format!(
-            "SELECT draco_encoded_pointcloud
-             FROM {table_name}
-             WHERE spin_index <= {num_spins}",
+            "SELECT spin_start_timestamp, draco_encoded_pointcloud
+        FROM {table_name}
+        WHERE spin_index <= {num_spins}",
         ))
         .await?;
 
