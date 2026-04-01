@@ -35,7 +35,7 @@ impl DataStore for SessionContext {
             .sql(build_search_query(params.clone()).as_str())
             .await?;
         let batches = df.collect().await?;
-        if batches.len() == 0 {
+        if batches.is_empty() {
             return Err(ServerError(CairnError::Generic {
                 reason: format!("No clips found with params, {:#?}", params),
             }));
@@ -174,7 +174,7 @@ impl DataStore for SessionContext {
         let batches = df.collect().await?;
         info!("collected {} bounding box batches", batches.len());
         let mut boxes = vec![];
-        if batches.len() > 0 {
+        if !batches.is_empty() {
             info!("found bounding boxes");
         }
         for batch in &batches {
@@ -275,7 +275,7 @@ impl TryFrom<RecordBatch> for PointClouds {
         let mut point_clouds = Vec::with_capacity(draco_col.len());
         let ts_col = value
             .column_by_name("spin_start_timestamp")
-            .ok_or_else(|| CairnError::MissingColumn("spin_start_timestamp"))?
+            .ok_or(CairnError::MissingColumn("spin_start_timestamp"))?
             .as_primitive::<datafusion::arrow::datatypes::Int64Type>();
 
         for row in 0..draco_col.len() {

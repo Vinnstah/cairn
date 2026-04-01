@@ -52,12 +52,12 @@ impl SceneLogger for RecordingStream {
     }
 
     async fn replay_point_clouds(&self, point_clouds: Vec<PointCloud>) -> Result<(), ServerError> {
-        for (_, pc) in point_clouds.iter().enumerate() {
+        for pc in point_clouds {
             self.set_timestamp_secs_since_epoch(
                 "ego_time",
                 pc.spin_start_timestamp as f64 / 1_000_000.0,
             );
-            self.log("world/lidar", pc)?;
+            self.log("world/lidar", &pc)?;
         }
         Ok(())
     }
@@ -120,7 +120,7 @@ impl SceneLogger for RecordingStream {
                         .with_labels([format!(
                             "{} ({})",
                             b.label_class,
-                            track_key.split('/').last().unwrap_or("")
+                            track_key.split('/').next_back().unwrap_or("")
                         )]),
                 )?;
 
