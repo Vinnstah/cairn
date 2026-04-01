@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PointCloud {
     pub points: Vec<[f32; 3]>,
     pub spin_start_timestamp: i64, // relative microseconds, same scale as ego/obstacles

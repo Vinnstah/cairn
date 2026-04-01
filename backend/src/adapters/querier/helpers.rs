@@ -119,3 +119,58 @@ pub fn build_search_query(params: ClipSearchParams) -> String {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shared::ClipSearchParams;
+
+    fn params(
+        min_speed: Option<f64>,
+        min_decel: Option<f64>,
+        classes: Vec<&str>,
+    ) -> ClipSearchParams {
+        ClipSearchParams {
+            min_speed,
+            min_decel,
+            label_classes: classes.into_iter().map(String::from).collect(),
+        }
+    }
+
+    #[test]
+    fn no_filters_includes_lidar_join() {
+        let sql = build_search_query(params(None, None, vec![]));
+        assert!(sql.contains("FROM ego_motion"));
+        assert!(sql.contains("SELECT DISTINCT clip_id FROM lidar"));
+        assert!(sql.contains("LIMIT 10"));
+    }
+
+    #[test]
+    fn single_label_class_uses_in_clause() {
+        let sql = build_search_query(params(None, None, vec!["car"]));
+        assert!(sql.contains("'car'"));
+        assert!(sql.contains("COUNT(DISTINCT label_class) = 1"));
+    }
+
+    #[test]
+    fn multiple_classes_require_all_present() {
+        let sql = build_search_query(params(None, None, vec!["car", "person"]));
+        assert!(sql.contains("'car'"));
+        assert!(sql.contains("'person'"));
+        assert!(sql.contains("COUNT(DISTINCT label_class) = 2"));
+    }
+
+    #[test]
+    fn min_speed_generates_having_clause() {
+        let sql = build_search_query(params(Some(15.0), None, vec![]));
+        assert!(sql.contains("AVG(SQRT(e.vx * e.vx + e.vy * e.vy)) > 15"));
+    }
+
+    #[test]
+    fn result_never_starts_with_empty_string() {
+        // Regression: vec![String::new()] init bug
+        let sql = build_search_query(params(None, None, vec![]));
+        assert!(!sql.trim().is_empty());
+        assert!(!sql.starts_with(','));
+    }
+}

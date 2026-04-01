@@ -256,6 +256,7 @@ impl DataStore for SessionContext {
 }
 
 // Use newtype to get around orphan-rule.
+#[derive(Debug)]
 pub struct PointClouds(pub Vec<PointCloud>);
 
 impl TryFrom<RecordBatch> for PointClouds {
@@ -306,5 +307,32 @@ impl TryFrom<RecordBatch> for PointClouds {
         }
 
         Ok(PointClouds(point_clouds))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+
+    use super::*;
+
+    #[test]
+    fn try_from_missing_column_returns_error() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "clip_id",
+            DataType::Utf8,
+            false,
+        )]));
+        let batch =
+            RecordBatch::try_new(schema, vec![Arc::new(StringArray::from(vec!["abc"]))]).unwrap();
+
+        let result = PointClouds::try_from(batch);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Missing column in result: 'draco_encoded_pointcloud'".to_owned()
+        );
     }
 }

@@ -147,3 +147,52 @@ pub async fn load_point_clouds(
 
     Ok(point_clouds)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::arrow::array::Float64Array;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::record_batch::RecordBatch;
+    use std::sync::Arc;
+
+    fn make_ego_batch(x: f64, y: f64, z: f64) -> RecordBatch {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("x", DataType::Float64, true),
+            Field::new("y", DataType::Float64, true),
+            Field::new("z", DataType::Float64, true),
+            Field::new("qx", DataType::Float64, true),
+            Field::new("qy", DataType::Float64, true),
+            Field::new("qz", DataType::Float64, true),
+            Field::new("qw", DataType::Float64, true),
+        ]));
+
+        RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Float64Array::from(vec![x])),
+                Arc::new(Float64Array::from(vec![y])),
+                Arc::new(Float64Array::from(vec![z])),
+                Arc::new(Float64Array::from(vec![0.0])),
+                Arc::new(Float64Array::from(vec![0.0])),
+                Arc::new(Float64Array::from(vec![0.0])),
+                Arc::new(Float64Array::from(vec![1.0])),
+            ],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn converts_batch_to_ego_motion() {
+        let batch = make_ego_batch(1.0, 2.0, 3.0);
+        let result = convert_record_batches_to_transforms(vec![batch]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].position, [1.0, 2.0, 3.0]);
+    }
+
+    #[test]
+    fn empty_batch_returns_empty_vec() {
+        let result = convert_record_batches_to_transforms(vec![]);
+        assert!(result.is_empty());
+    }
+}
