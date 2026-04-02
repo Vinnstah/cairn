@@ -16,3 +16,4 @@ simple_logger = "5.2.0"
 tokio = { version = "1.50.0", features = ["full"] }
 shared = { path = "../shared" }
 serde_json = "1.0.149"
+rayon = "1.11.0"

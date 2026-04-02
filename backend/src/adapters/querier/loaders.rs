@@ -6,6 +6,7 @@ use datafusion::{
     prelude::{ParquetReadOptions, SessionContext},
 };
 use log::{info, warn};
+use rayon::prelude::*;
 use shared::error::CairnError;
 
 use crate::{
@@ -84,7 +85,7 @@ pub async fn load_ego_motion(
 
 fn convert_record_batches_to_point_clouds(batches: Vec<RecordBatch>) -> Vec<PointCloud> {
     batches
-        .into_iter()
+        .into_par_iter() // rayon parallel iterator
         .flat_map(|batch| {
             PointClouds::try_from(batch)
                 .expect("convert record batch to point clouds")

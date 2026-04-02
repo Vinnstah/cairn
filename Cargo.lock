@@ -1843,6 +1843,7 @@ dependencies = [
  "datafusion 52.3.0",
  "draco-rs",
  "log",
+ "rayon",
  "rerun",
  "serde",
  "serde_json",
