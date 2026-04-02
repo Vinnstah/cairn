@@ -52,12 +52,23 @@ impl SceneLogger for RecordingStream {
     }
 
     async fn replay_point_clouds(&self, point_clouds: Vec<PointCloud>) -> Result<(), ServerError> {
-        for pc in point_clouds {
+        for pc in &point_clouds {
             self.set_timestamp_secs_since_epoch(
                 "ego_time",
                 pc.spin_start_timestamp as f64 / 1_000_000.0,
             );
-            self.log("world/lidar", &pc)?;
+
+            // Downsample: take every Nth point
+            // Full cloud is ~254k points — 1 in 10 gives ~25k which is plenty for viz
+            let downsampled: Vec<[f32; 3]> = pc.points.iter().step_by(10).copied().collect();
+
+            self.log(
+                "world/lidar",
+                &rerun::archetypes::Points3D::new(downsampled),
+            )
+            .map_err(|e| CairnError::Generic {
+                reason: e.to_string(),
+            })?;
         }
         Ok(())
     }
@@ -83,52 +94,46 @@ impl SceneLogger for RecordingStream {
     }
 
     async fn replay_bounding_boxes(&self, boxes: Vec<BoundingBox>) -> Result<(), ServerError> {
-        // Group by track_id
+        use rerun::TimeColumn;
+
+        // Group by track
         let mut by_track: std::collections::HashMap<String, Vec<&BoundingBox>> =
             std::collections::HashMap::new();
-
         for b in &boxes {
             let short_id: String = b.track_id.chars().take(8).collect();
-            let key = format!("{}/{}", b.label_class, short_id);
-            by_track.entry(key).or_default().push(b);
+            by_track
+                .entry(format!("{}/{}", b.label_class, short_id))
+                .or_default()
+                .push(b);
         }
 
-        for (track_key, track_boxes) in &by_track {
+        for (track_key, mut track_boxes) in by_track {
+            track_boxes.sort_by_key(|b| b.timestamp_us);
             let entity_path = format!("world/obstacles/{}", track_key);
 
-            // Sort by time
-            let mut sorted = track_boxes.to_vec();
-            sorted.sort_by_key(|b| b.timestamp_us);
+            let times: Vec<f64> = track_boxes
+                .iter()
+                .map(|b| b.timestamp_us as f64 / 1_000_000.0)
+                .collect();
 
-            for (i, b) in sorted.iter().enumerate() {
-                // Each box is visible until the next box for this track arrives
-                // For the last box, keep it visible for one extra interval
-                let next_ts = sorted
-                    .get(i + 1)
-                    .map(|next| next.timestamp_us)
-                    .unwrap_or(b.timestamp_us + 100_000); // 100ms falloff
+            let centers: Vec<[f32; 3]> = track_boxes.iter().map(|b| b.center).collect();
 
-                // Log box at its timestamp
-                self.set_timestamp_secs_since_epoch(
-                    "ego_time",
-                    b.timestamp_us as f64 / 1_000_000.0,
-                );
-                self.log(
-                    entity_path.as_str(),
-                    &rerun::archetypes::Boxes3D::from_centers_and_sizes([b.center], [b.size])
-                        .with_quaternions([rerun::Quaternion::from_xyzw(b.rotation)])
-                        .with_labels([format!(
-                            "{} ({})",
-                            b.label_class,
-                            track_key.split('/').next_back().unwrap_or("")
-                        )]),
-                )?;
+            let sizes: Vec<[f32; 3]> = track_boxes.iter().map(|b| b.size).collect();
 
-                // Log a clear just before the next box arrives so it doesn't
-                // persist beyond its valid window
-                self.set_timestamp_secs_since_epoch("ego_time", (next_ts - 1) as f64 / 1_000_000.0);
-                self.log(entity_path.as_str(), &rerun::archetypes::Clear::flat())?;
-            }
+            let rotations: Vec<rerun::Quaternion> = track_boxes
+                .iter()
+                .map(|b| rerun::Quaternion::from_xyzw(b.rotation))
+                .collect();
+
+            let time_column = TimeColumn::new_timestamp_secs_since_epoch("ego_time", times);
+            self.send_columns(
+                entity_path,
+                [time_column],
+                rerun::archetypes::Boxes3D::from_centers_and_sizes(centers, sizes)
+                    .with_quaternions(rotations)
+                    .columns_of_unit_batches()
+                    .unwrap(),
+            )?;
         }
 
         Ok(())
