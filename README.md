@@ -1,7 +1,9 @@
 # Cairn
  
 Cairn is a scenario mining tool for autonomous vehicle data built in Rust. It lets engineers query a large multi-sensor driving dataset using human-readable conditions and instantly replay the matching clips as a synchronized 3D visualization of ego trajectory, LiDAR point clouds, and labeled bounding boxes.
- 
+
+<img width="1098" height="748" alt="Screenshot 2026-04-02 at 22 12 49" src="https://github.com/user-attachments/assets/2bf437b6-04a6-4584-968e-9a5e388a9781" />
+
 ---
  
 ## What is it?
@@ -23,6 +25,8 @@ For each matching clip the backend fetches ego motion samples, [Draco-decoded](h
 - The vehicle's path as a line strip
 - Rotating LiDAR scans as point clouds
 - Tracked obstacle bounding boxes that appear, move, and disappear in sync with detections
+
+<img width="1676" height="962" alt="Screenshot 2026-04-02 at 22 12 36" src="https://github.com/user-attachments/assets/6a1236a6-61de-40be-8199-22a9fe24d16b" />
  
 All sensor streams are locked to the same `ego_time` timeline so they are temporally aligned. The engineer can scrub through the clip, inspect individual frames, and immediately understand the driving context of the scenario they queried for.
  
