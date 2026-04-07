@@ -6,7 +6,7 @@ use log::info;
 use crate::{
     adapters::http,
     core::{
-        domain::config::Dataset,
+        domain::config::{Config, Dataset},
         ports::{
             inbound::{data_query::DataQuery, replay::Replay},
             outbound::{data_store::DataStore, scene_logger::SceneLogger},
@@ -24,7 +24,7 @@ pub async fn start() {
     let replayer_repo = rerun::RecordingStreamBuilder::new("replayer_repo")
         .spawn()
         .expect("create recording_stream");
-    let app_state = AppState::new(querier_repo, Arc::new(replayer_repo));
+    let app_state = AppState::new(config, querier_repo, Arc::new(replayer_repo));
     let _ = app_state.querier.register_tables().await;
     let app = router
         .merge(http::clips_handler::routes(app_state.clone()))
@@ -43,10 +43,11 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(
+        config: Config,
         data_store: Arc<dyn DataStore + Send + Sync>,
         logger: Arc<dyn SceneLogger + Send + Sync>,
     ) -> Self {
-        let data_query_service = Arc::new(DataQueryService::new(data_store));
+        let data_query_service = Arc::new(DataQueryService::new(config, data_store));
         let replay_service = Arc::new(ReplayService::new(logger, data_query_service.clone()));
         Self {
             querier: data_query_service,
