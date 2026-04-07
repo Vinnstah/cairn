@@ -1,14 +1,17 @@
 use shared::{ClipSearchParams, SchemaResponse};
 
 use crate::{
-    core::domain::model::{BoundingBox, EgoMotion, PointCloud},
+    core::domain::{
+        config::Dataset,
+        model::{BoundingBox, EgoMotion, PointCloud},
+    },
     error::ServerError,
 };
 
 /// Responsible of connecting to a data-store and querying the underlying data
 #[async_trait::async_trait]
 pub trait DataStore {
-    async fn register_tables(&self) -> Result<(), ServerError>;
+    async fn register_tables(&self, datasets: Vec<Dataset>) -> Result<(), ServerError>;
     async fn query_clips_with_params(
         &self,
         params: ClipSearchParams,

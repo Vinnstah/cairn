@@ -15,7 +15,10 @@ use crate::{
     adapters::querier::helpers::{build_search_query, register_with_clip_id},
     core::{
         build_dataset_path,
-        domain::model::{BoundingBox, EgoMotion, PointCloud},
+        domain::{
+            config::Dataset,
+            model::{BoundingBox, EgoMotion, PointCloud},
+        },
         ports::outbound::data_store::DataStore,
     },
 };
@@ -53,46 +56,71 @@ impl DataStore for SessionContext {
         Ok(result)
     }
 
-    async fn register_tables(&self) -> Result<(), ServerError> {
+    async fn register_tables(&self, datasets: Vec<Dataset>) -> Result<(), ServerError> {
         // The dataset is saved locally at ./data/nvidia_physical_dataset
-        let base = build_dataset_path();
+        // let base = build_dataset_path();
 
-        for (folder, file_ext, table_name) in [
-            ("egomotion.chunk_0000", ".egomotion.parquet", "ego_motion"),
-            (
-                "camera_front_wide_120fov.chunk_0000",
-                ".camera_front_wide_120fov.timestamps.parquet",
-                "camera_timestamps",
-            ),
-            ("lidar.chunk_0000", ".lidar_top_360fov.parquet", "lidar"),
-            (
-                "obstacle.offline.chunk_0000",
-                ".obstacle.offline.parquet",
-                "obstacles",
-            ),
-        ] {
-            register_with_clip_id(self, &base.join(folder), file_ext, table_name).await?;
+        // for (folder, file_ext, table_name) in [
+        //     ("egomotion.chunk_0000", ".egomotion.parquet", "ego_motion"),
+        //     (
+        //         "camera_front_wide_120fov.chunk_0000",
+        //         ".camera_front_wide_120fov.timestamps.parquet",
+        //         "camera_timestamps",
+        //     ),
+        //     ("lidar.chunk_0000", ".lidar_top_360fov.parquet", "lidar"),
+        //     (
+        //         "obstacle.offline.chunk_0000",
+        //         ".obstacle.offline.parquet",
+        //         "obstacles",
+        //     ),
+        // ] {
+        //     register_with_clip_id(self, &base.join(folder), file_ext, table_name).await?;
+        // }
+
+        // self.register_parquet(
+        //     "data_collection",
+        //     base.join("metadata/data_collection.parquet")
+        //         .to_str()
+        //         .unwrap(),
+        //     ParquetReadOptions::default(),
+        // )
+        // .await?;
+
+        // self.register_parquet(
+        //     "feature_presence",
+        //     base.join("metadata/feature_presence.parquet")
+        //         .to_str()
+        //         .unwrap(),
+        //     ParquetReadOptions::default(),
+        // )
+        // .await?;
+
+        // info!("Registered parquets from {}", base.display());
+        info!("Registering datasets");
+        for dataset in datasets {
+            match dataset.semantics.clip_id.is_some() {
+                true => {
+                    let _ = self
+                        .register_parquet(
+                            &dataset.name,
+                            dataset.path.to_str().expect("convert path to str"),
+                            ParquetReadOptions::default(),
+                        )
+                        .await;
+                }
+                false => {
+                    register_with_clip_id(
+                        self,
+                        dataset.path.as_path(),
+                        &dataset.file_ext,
+                        &dataset.name,
+                    )
+                    .await?;
+                }
+            }
+
+            info!("Registered dataset from {}", dataset.name);
         }
-
-        self.register_parquet(
-            "data_collection",
-            base.join("metadata/data_collection.parquet")
-                .to_str()
-                .unwrap(),
-            ParquetReadOptions::default(),
-        )
-        .await?;
-
-        self.register_parquet(
-            "feature_presence",
-            base.join("metadata/feature_presence.parquet")
-                .to_str()
-                .unwrap(),
-            ParquetReadOptions::default(),
-        )
-        .await?;
-
-        info!("Registered parquets from {}", base.display());
         Ok(())
     }
 

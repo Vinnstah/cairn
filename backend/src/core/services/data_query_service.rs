@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use crate::{
     core::{
-        domain::model::{BoundingBox, EgoMotion, PointCloud},
+        domain::{
+            config::Config,
+            model::{BoundingBox, EgoMotion, PointCloud},
+        },
         ports::{inbound::data_query::DataQuery, outbound::data_store::DataStore},
     },
     error::ServerError,
@@ -11,19 +14,20 @@ use shared::{ClipSearchParams, SchemaResponse};
 
 #[derive(Clone)]
 pub struct DataQueryService {
+    config: Config,
     data_store: Arc<dyn DataStore + Send + Sync>,
 }
 
 impl DataQueryService {
-    pub fn new(data_store: Arc<dyn DataStore + Send + Sync>) -> Self {
-        Self { data_store }
+    pub fn new(config: Config, data_store: Arc<dyn DataStore + Send + Sync>) -> Self {
+        Self { config, data_store }
     }
 }
 
 #[async_trait::async_trait]
 impl DataQuery for DataQueryService {
     async fn register_tables(&self) -> Result<(), ServerError> {
-        self.data_store.register_tables().await
+        self.data_store.register_tables(self.config.datasets.clone()).await
     }
 
     async fn fetch_clips_with_params(
