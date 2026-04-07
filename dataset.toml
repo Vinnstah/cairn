@@ -1,0 +1,15 @@
+[[datasets]]
+name = "Ego motion"
+path = "./data/nvidia_physical_dataset/egomotion.offline.chunk_0000"
+description = "ego_motion for the NVIDIA PhysicalAI Autonomous Vehicles dataset"
+
+[datasets.semantics]
+timestamp = "timestamp"
+
+[[datasets]]
+name = "LIDAR"
+path = "./data/nvidia_physical_dataset/lidar.chunk_0000"
+description = "LiDAR for the NVIDIA PhysicalAI Autonomous Vehicles dataset"
+
+[datasets.semantics]
+timestamp = "timestamp_us"
