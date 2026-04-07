@@ -6,6 +6,7 @@ use log::info;
 use crate::{
     adapters::http,
     core::{
+        domain::config::Dataset,
         ports::{
             inbound::{data_query::DataQuery, replay::Replay},
             outbound::{data_store::DataStore, scene_logger::SceneLogger},
@@ -16,6 +17,8 @@ use crate::{
 
 pub async fn start() {
     simple_logger::init_with_level(log::Level::Info).unwrap();
+    let config = Dataset::load_from_config().await.unwrap();
+    info!("{:#?}", config);
     let router = axum::Router::<()>::new();
     let querier_repo = Arc::new(SessionContext::new());
     let replayer_repo = rerun::RecordingStreamBuilder::new("replayer_repo")

@@ -2,8 +2,10 @@ use axum::{Json, http::StatusCode, response::IntoResponse};
 use rerun::RecordingStreamError;
 use serde_json::json;
 use shared::error::CairnError;
+use toml::de::Error;
 
 // Add a newtype wrapper for CairnError to get around orphan rule and also to implement backend-specific traits for it without having to import the dependencies into shared.
+#[derive(Debug)]
 pub struct ServerError(pub CairnError);
 
 impl IntoResponse for ServerError {
@@ -49,6 +51,11 @@ impl IntoResponse for ServerError {
                 "Streaming error",
                 format!("Streaming error: {reason}"),
             ),
+            CairnError::ParseConfigError { reason } => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Parse config error",
+                format!("Parse config error: {reason}"),
+            ),
         };
         (
             status,
@@ -84,6 +91,22 @@ impl From<ServerError> for CairnError {
 impl From<RecordingStreamError> for ServerError {
     fn from(e: RecordingStreamError) -> Self {
         ServerError(CairnError::StreamingError {
+            reason: e.to_string(),
+        })
+    }
+}
+
+impl From<Error> for ServerError {
+    fn from(e: Error) -> Self {
+        ServerError(CairnError::ParseConfigError {
+            reason: e.to_string(),
+        })
+    }
+}
+
+impl From<std::io::Error> for ServerError {
+    fn from(e: std::io::Error) -> Self {
+        ServerError(CairnError::Generic {
             reason: e.to_string(),
         })
     }

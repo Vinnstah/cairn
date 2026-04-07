@@ -25,4 +25,7 @@ pub enum CairnError {
 
     #[error("Streaming error: {reason}")]
     StreamingError { reason: String },
+
+    #[error("Parse config from file: {reason}")]
+    ParseConfigError { reason: String },
 }
