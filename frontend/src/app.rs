@@ -1,7 +1,7 @@
 use crate::client::{fetch_schema, trigger_replay};
 use egui::{Color32, RichText, ScrollArea, Ui};
-use shared::{ClipSearchParams, ColumnInfo};
-use std::collections::HashSet;
+use shared::{ClipSearchParams, ColumnInfo, TableSchema};
+use std::collections::{HashMap, HashSet};
 
 const NUMERIC_TYPES: &[&str] = &["Float32", "Float64", "Int32", "Int64"];
 
@@ -17,10 +17,12 @@ struct ColumnFilter {
 }
 
 pub struct CairnApp {
-    columns: Vec<ColumnInfo>,
+    // Schema — keyed by table name
+    tables: Vec<TableSchema>,
+    filters: HashMap<String, HashMap<String, ColumnFilter>>, // table -> col -> filter
+    selected_table: Option<String>,
     label_classes: Vec<String>,
     selected_label_classes: HashSet<String>,
-    filters: std::collections::HashMap<String, ColumnFilter>,
     schema_error: Option<String>,
     min_speed: String,
     min_decel: String,
@@ -32,25 +34,33 @@ pub struct CairnApp {
 
 impl CairnApp {
     pub fn new(_cc: &eframe::CreationContext) -> Self {
-        let (columns, label_classes, schema_error) = match fetch_schema() {
-            Ok(schema) => (schema.column_info, schema.label_classes, None),
+        let (tables, label_classes, schema_error) = match fetch_schema() {
+            Ok(schema) => (schema.tables, schema.label_classes, None),
             Err(e) => (
                 vec![],
                 vec![],
                 Some(format!("Could not reach backend: {}", e)),
             ),
         };
-
-        let filters = columns
+        let filters = tables
             .iter()
-            .map(|c| (c.name.clone(), ColumnFilter::default()))
+            .map(|t| {
+                (
+                    t.table_name.clone(),
+                    t.columns
+                        .iter()
+                        .map(|c| (c.name.clone(), ColumnFilter::default()))
+                        .collect::<HashMap<_, _>>(),
+                )
+            })
             .collect();
 
         Self {
-            columns,
+            tables,
+            filters,
+            selected_table: None,
             label_classes,
             selected_label_classes: HashSet::new(),
-            filters,
             schema_error,
             min_speed: String::new(),
             min_decel: String::new(),
@@ -75,12 +85,20 @@ impl CairnApp {
                     match fetch_schema() {
                         Ok(schema) => {
                             self.filters = schema
-                                .column_info
+                                .tables
                                 .iter()
-                                .map(|c| (c.name.clone(), ColumnFilter::default()))
+                                .map(|t| {
+                                    (
+                                        t.table_name.clone(),
+                                        t.columns
+                                            .iter()
+                                            .map(|c| (c.name.clone(), ColumnFilter::default()))
+                                            .collect::<HashMap<_, _>>(),
+                                    )
+                                })
                                 .collect();
                             self.label_classes = schema.label_classes;
-                            self.columns = schema.column_info;
+                            self.tables = schema.tables;
                             self.schema_error = None;
                         }
                         Err(e) => {
@@ -242,7 +260,7 @@ impl CairnApp {
             let arrow = if self.columns_expanded { "▾" } else { "▸" };
             if ui
                 .button(
-                    RichText::new(format!("{}  ego_motion columns", arrow))
+                    RichText::new(format!("{}  columns", arrow))
                         .strong()
                         .size(12.0),
                 )
@@ -251,9 +269,14 @@ impl CairnApp {
                 self.columns_expanded = !self.columns_expanded;
             }
 
-            let active_count = self.filters.values().filter(|f| f.enabled).count();
+            let active_count: usize = self
+                .filters
+                .values()
+                .flat_map(|t| t.values())
+                .filter(|f| f.enabled)
+                .count();
+
             if active_count > 0 {
-                ui.add_space(6.0);
                 ui.label(
                     RichText::new(format!("{} active", active_count))
                         .size(11.0)
@@ -266,24 +289,53 @@ impl CairnApp {
             return;
         }
 
-        ui.add_space(4.0);
-        ui.label(
-            RichText::new("Enable numeric columns to add range filters")
-                .weak()
-                .size(11.0),
-        );
-        ui.add_space(4.0);
+        ui.add_space(6.0);
 
-        ScrollArea::vertical().id_salt("col_scroll").show(ui, |ui| {
-            let columns = self.columns.clone();
-            for col in &columns {
-                self.column_row(ui, col);
+        // Table selector tabs
+        ui.horizontal(|ui| {
+            let tables = self
+                .tables
+                .iter()
+                .map(|t| t.table_name.clone())
+                .collect::<Vec<_>>();
+            for table_name in &tables {
+                let selected = self.selected_table.as_deref() == Some(table_name);
+                let label = RichText::new(table_name).size(11.0);
+                if ui.selectable_label(selected, label).clicked() {
+                    self.selected_table = Some(table_name.clone());
+                }
             }
         });
+
+        ui.add_space(4.0);
+        ui.separator();
+
+        // Show columns for selected table
+        if let Some(table_name) = &self.selected_table.clone() {
+            if let Some(table) = self.tables.iter().find(|t| &t.table_name == table_name) {
+                let columns = table.columns.clone();
+                ScrollArea::vertical()
+                    .id_salt("col_scroll")
+                    .max_height(200.0)
+                    .show(ui, |ui| {
+                        for col in &columns {
+                            self.column_row_for_table(ui, table_name, col);
+                        }
+                    });
+            }
+        } else {
+            ui.label(RichText::new("Select a table above").weak().size(11.0));
+        }
     }
 
-    fn column_row(&mut self, ui: &mut Ui, col: &ColumnInfo) {
-        let filter = self.filters.entry(col.name.clone()).or_default();
+    fn column_row_for_table(&mut self, ui: &mut Ui, table_name: &str, col: &ColumnInfo) {
+        let filter = self
+            .filters
+            .entry(table_name.to_string())
+            .or_default()
+            .entry(col.name.clone())
+            .or_default();
+
         let numeric = is_numeric(&col.data_type);
 
         ui.horizontal(|ui| {
@@ -292,7 +344,6 @@ impl CairnApp {
             });
 
             ui.label(RichText::new(&col.name).monospace().size(11.0));
-
             ui.label(
                 RichText::new(&col.data_type)
                     .weak()
@@ -320,7 +371,6 @@ impl CairnApp {
                 });
             }
         });
-
         ui.add_space(1.0);
     }
 
