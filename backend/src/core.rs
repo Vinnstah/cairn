@@ -1,8 +1,4 @@
-use std::{
-    fs::{self, File},
-    io::Read,
-    path::PathBuf,
-};
+use std::{fs::File, io::Read, path::PathBuf};
 
 use crate::{
     core::domain::config::{Config, Dataset},

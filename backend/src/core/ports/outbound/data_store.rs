@@ -2,7 +2,7 @@ use shared::{ClipSearchParams, SchemaResponse};
 
 use crate::{
     core::domain::{
-        config::Dataset,
+        config::{Config, Dataset, SchemaDefinition},
         model::{BoundingBox, EgoMotion, PointCloud},
     },
     error::ServerError,
@@ -22,6 +22,8 @@ pub trait DataStore {
         num_spins: usize,
     ) -> Result<Vec<PointCloud>, ServerError>;
     async fn query_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, ServerError>;
-    async fn query_schema(&self) -> Result<SchemaResponse, ServerError>;
+    async fn query_schema(&self, config: &Config) -> Result<SchemaResponse, ServerError>;
     async fn query_bounding_boxes(&self, clip_id: &str) -> Result<Vec<BoundingBox>, ServerError>;
+    async fn query_label_classes(&self, config: &Config) -> Result<Vec<String>, ServerError>;
+    async fn load_schema(&self, dataset: &Dataset) -> SchemaDefinition;
 }

@@ -13,15 +13,25 @@ pub struct Dataset {
     pub path: PathBuf,
     pub file_ext: String,
     pub description: Option<String>,
-    pub schema: Option<Schema>,
+    pub schema: Option<SchemaDefinition>,
+    pub classification: Option<ClassificationSpec>,
     pub semantics: Semantics,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct Schema {
-    /// A sequence of fields that describe the schema.
-    pub fields: Vec<HashMap<String, String>>,
-    /// A map of key-value pairs containing additional metadata.
+/// Domain representation of a column field — mirrors Arrow's Field
+/// without importing datafusion::arrow::datatypes::Field.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct FieldDefinition {
+    pub name: String,
+    pub data_type: String, // Arrow type as string e.g. "Float64", "Int64", "Utf8"
+    pub nullable: bool,
+    pub metadata: HashMap<String, String>,
+}
+
+/// Domain representation of a schema.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SchemaDefinition {
+    pub fields: Vec<FieldDefinition>,
     pub metadata: HashMap<String, String>,
 }
 
@@ -29,4 +39,12 @@ pub struct Schema {
 pub struct Semantics {
     pub timestamp: Option<String>,
     pub clip_id: Option<String>,
+    pub label_class: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ClassificationSpec {
+    pub timestamp: Option<String>,
+    pub clip_id: Option<String>,
+    pub label_class: Option<String>,
 }

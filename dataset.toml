@@ -15,3 +15,16 @@ file_ext = ".lidar_top_360fov.parquet"
 
 [datasets.semantics]
 timestamp = "timestamp_us"
+
+[[datasets]]
+name = "obstacles"
+path = "/Users/viktorjansson/Developer/Rust/cairn/data/nvidia_physical_dataset/obstacle.offline.chunk_0000"
+description = "Obstacles for the NVIDIA PhysicalAI Autonomous Vehicles dataset"
+file_ext = ".obstacle.offline.parquet"
+
+[datasets.classification]
+timestamp = "timestamp_us"
+label_class = "label_class"
+
+[datasets.semantics]
+label_class = "label_class"

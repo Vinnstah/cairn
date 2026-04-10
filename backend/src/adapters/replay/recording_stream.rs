@@ -51,11 +51,15 @@ impl SceneLogger for RecordingStream {
         Ok(())
     }
 
-    async fn replay_point_clouds(&self, point_clouds: Vec<PointCloud>) -> Result<(), ServerError> {
+    async fn replay_point_clouds(
+        &self,
+        point_clouds: Vec<PointCloud>,
+        time_offset_us: i64,
+    ) -> Result<(), ServerError> {
         for pc in &point_clouds {
             self.set_timestamp_secs_since_epoch(
                 "ego_time",
-                pc.spin_start_timestamp as f64 / 1_000_000.0,
+                (pc.spin_start_timestamp + time_offset_us) as f64 / 1_000_000.0,
             );
 
             // Downsample: take every Nth point
@@ -73,7 +77,11 @@ impl SceneLogger for RecordingStream {
         Ok(())
     }
 
-    async fn replay_ego_motion(&self, ego_motion: Vec<EgoMotion>) -> Result<(), ServerError> {
+    async fn replay_ego_motion(
+        &self,
+        ego_motion: Vec<EgoMotion>,
+        time_offset_us: i64,
+    ) -> Result<(), ServerError> {
         for (i, sample) in ego_motion.iter().enumerate() {
             self.set_time_sequence("ego_step", i as i64);
             self.log(
@@ -93,7 +101,11 @@ impl SceneLogger for RecordingStream {
         Ok(())
     }
 
-    async fn replay_bounding_boxes(&self, boxes: Vec<BoundingBox>) -> Result<(), ServerError> {
+    async fn replay_bounding_boxes(
+        &self,
+        boxes: Vec<BoundingBox>,
+        time_offset_us: i64,
+    ) -> Result<(), ServerError> {
         use rerun::TimeColumn;
 
         // Group by track
@@ -111,29 +123,35 @@ impl SceneLogger for RecordingStream {
             track_boxes.sort_by_key(|b| b.timestamp_us);
             let entity_path = format!("world/obstacles/{}", track_key);
 
-            let times: Vec<f64> = track_boxes
+            let mut times: Vec<f64> = track_boxes
                 .iter()
-                .map(|b| b.timestamp_us as f64 / 1_000_000.0)
+                .map(|b| (b.timestamp_us + time_offset_us) as f64 / 1_000_000.0)
                 .collect();
 
             let centers: Vec<[f32; 3]> = track_boxes.iter().map(|b| b.center).collect();
-
             let sizes: Vec<[f32; 3]> = track_boxes.iter().map(|b| b.size).collect();
-
             let rotations: Vec<rerun::Quaternion> = track_boxes
                 .iter()
                 .map(|b| rerun::Quaternion::from_xyzw(b.rotation))
                 .collect();
 
-            let time_column = TimeColumn::new_timestamp_secs_since_epoch("ego_time", times);
+            // Log the detections
+            let time_column = TimeColumn::new_timestamp_secs_since_epoch("ego_time", times.clone());
             self.send_columns(
-                entity_path,
+                entity_path.clone(),
                 [time_column],
                 rerun::archetypes::Boxes3D::from_centers_and_sizes(centers, sizes)
                     .with_quaternions(rotations)
                     .columns_of_unit_batches()
                     .unwrap(),
             )?;
+
+            // Log a clear just after the last detection so the box disappears
+            // when the track is no longer observed
+            let last_ts = track_boxes.last().unwrap().timestamp_us;
+            let clear_ts = (last_ts + time_offset_us + 1) as f64 / 1_000_000.0;
+            self.set_timestamp_secs_since_epoch("ego_time", clear_ts);
+            self.log(entity_path, &rerun::archetypes::Clear::flat())?;
         }
 
         Ok(())

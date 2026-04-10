@@ -1,22 +1,24 @@
+use std::sync::Arc;
+
 use datafusion::{
     arrow::{
         self,
         array::{Array, AsArray, RecordBatch, StringArray},
+        datatypes::Schema,
     },
     prelude::{ParquetReadOptions, SessionContext},
 };
 use draco_rs::prelude::ffi::draco::GeometryAttribute_Type;
 use draco_rs::prelude::{Decoder, DecoderBuffer};
-use log::info;
-use shared::error::CairnError;
+use log::{info, warn};
 use shared::{ClipSearchParams, ColumnInfo, SchemaResponse};
+use shared::{TableSchema, error::CairnError};
 
 use crate::{
     adapters::querier::helpers::{build_search_query, register_with_clip_id},
     core::{
-        build_dataset_path,
         domain::{
-            config::Dataset,
+            config::{Config, Dataset, FieldDefinition, SchemaDefinition},
             model::{BoundingBox, EgoMotion, PointCloud},
         },
         ports::outbound::data_store::DataStore,
@@ -57,45 +59,6 @@ impl DataStore for SessionContext {
     }
 
     async fn register_tables(&self, datasets: Vec<Dataset>) -> Result<(), ServerError> {
-        // The dataset is saved locally at ./data/nvidia_physical_dataset
-        // let base = build_dataset_path();
-
-        // for (folder, file_ext, table_name) in [
-        //     ("egomotion.chunk_0000", ".egomotion.parquet", "ego_motion"),
-        //     (
-        //         "camera_front_wide_120fov.chunk_0000",
-        //         ".camera_front_wide_120fov.timestamps.parquet",
-        //         "camera_timestamps",
-        //     ),
-        //     ("lidar.chunk_0000", ".lidar_top_360fov.parquet", "lidar"),
-        //     (
-        //         "obstacle.offline.chunk_0000",
-        //         ".obstacle.offline.parquet",
-        //         "obstacles",
-        //     ),
-        // ] {
-        //     register_with_clip_id(self, &base.join(folder), file_ext, table_name).await?;
-        // }
-
-        // self.register_parquet(
-        //     "data_collection",
-        //     base.join("metadata/data_collection.parquet")
-        //         .to_str()
-        //         .unwrap(),
-        //     ParquetReadOptions::default(),
-        // )
-        // .await?;
-
-        // self.register_parquet(
-        //     "feature_presence",
-        //     base.join("metadata/feature_presence.parquet")
-        //         .to_str()
-        //         .unwrap(),
-        //     ParquetReadOptions::default(),
-        // )
-        // .await?;
-
-        // info!("Registered parquets from {}", base.display());
         info!("Registering datasets");
         for dataset in datasets {
             match dataset.semantics.clip_id.is_some() {
@@ -138,32 +101,71 @@ impl DataStore for SessionContext {
         load_ego_motion(self, clip_id).await
     }
 
-    async fn query_schema(&self) -> Result<SchemaResponse, ServerError> {
-        let df = self
-            .sql("SELECT * FROM ego_motion LIMIT 0")
-            .await
-            .map_err(|err| CairnError::QueryFailed(err.to_string()))?;
-        let schema = df
-            .schema()
-            .fields()
-            .iter()
-            .map(|f| ColumnInfo {
-                name: f.name().clone(),
-                data_type: f.data_type().to_string(),
-            })
-            .collect();
+    async fn query_schema(&self, config: &Config) -> Result<SchemaResponse, ServerError> {
+        info!["querying schemas"];
+        let mut tables = vec![];
 
-        // Fetch all unique label_classes from the dataset
+        for dataset in &config.datasets {
+            let df = match self
+                .sql(&format!("SELECT * FROM {} LIMIT 0", dataset.name))
+                .await
+            {
+                Ok(df) => df,
+                Err(e) => {
+                    warn!("could not query schema for table {}: {}", dataset.name, e);
+                    continue;
+                }
+            };
+
+            let schema = df.schema();
+            let columns = schema
+                .fields()
+                .iter()
+                .map(|f| ColumnInfo {
+                    name: f.name().clone(),
+                    data_type: f.data_type().to_string(),
+                    nullable: f.is_nullable(),
+                })
+                .collect();
+
+            tables.push(TableSchema {
+                table_name: dataset.name.clone(),
+                columns,
+            });
+        }
+        info!["found {} schemas", tables.len()];
+        let label_classes = self.query_label_classes(config).await?;
+
+        Ok(SchemaResponse {
+            tables,
+            label_classes,
+        })
+    }
+
+    async fn query_label_classes(&self, config: &Config) -> Result<Vec<String>, ServerError> {
+        let Some(classification) = config
+            .datasets
+            .iter()
+            .find_map(|d| d.classification.as_ref().map(|c| (d.name.as_str(), c)))
+        else {
+            return Ok(vec![]);
+        };
+
+        let (table, spec) = classification;
+        let label_class = spec.label_class.clone().unwrap();
         let df = self
-        .sql("SELECT DISTINCT label_class FROM obstacles WHERE label_class IS NOT NULL ORDER BY label_class")
-        .await?;
+            .sql(&format!(
+                "SELECT DISTINCT {:?} FROM {} WHERE {:?} IS NOT NULL ORDER BY {:?}",
+                &label_class, table, &label_class, &label_class
+            ))
+            .await?;
 
         let batches = df.collect().await?;
-
         let mut classes = vec![];
+
         for batch in &batches {
             let col = batch
-                .column_by_name("label_class")
+                .column_by_name(spec.label_class.clone().expect("get label_class").as_ref())
                 .ok_or(CairnError::MissingColumn("label_class"))?
                 .as_any()
                 .downcast_ref::<arrow::array::StringViewArray>()
@@ -175,7 +177,8 @@ impl DataStore for SessionContext {
                 }
             }
         }
-        Ok(SchemaResponse::new(schema, classes))
+
+        Ok(classes)
     }
 
     async fn query_bounding_boxes(&self, clip_id: &str) -> Result<Vec<BoundingBox>, ServerError> {
@@ -281,6 +284,16 @@ impl DataStore for SessionContext {
         }
         Ok(boxes)
     }
+
+    async fn load_schema(&self, dataset: &Dataset) -> SchemaDefinition {
+        let schema = self
+            .table(dataset.name.as_str())
+            .await
+            .unwrap()
+            .schema()
+            .clone();
+        schema.inner().into()
+    }
 }
 
 // Use newtype to get around orphan-rule.
@@ -335,6 +348,24 @@ impl TryFrom<RecordBatch> for PointClouds {
         }
 
         Ok(PointClouds(point_clouds))
+    }
+}
+
+impl From<&Arc<Schema>> for SchemaDefinition {
+    fn from(value: &Arc<Schema>) -> Self {
+        SchemaDefinition {
+            fields: value
+                .fields()
+                .iter()
+                .map(|field| FieldDefinition {
+                    name: field.name().to_owned(),
+                    data_type: field.data_type().to_string(),
+                    nullable: field.is_nullable(),
+                    metadata: field.metadata().to_owned(),
+                })
+                .collect(),
+            metadata: value.metadata().to_owned(),
+        }
     }
 }
 
