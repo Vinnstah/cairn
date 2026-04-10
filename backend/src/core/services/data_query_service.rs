@@ -27,7 +27,9 @@ impl DataQueryService {
 #[async_trait::async_trait]
 impl DataQuery for DataQueryService {
     async fn register_tables(&self) -> Result<(), ServerError> {
-        self.data_store.register_tables(self.config.datasets.clone()).await
+        self.data_store
+            .register_tables(self.config.datasets.clone())
+            .await
     }
 
     async fn fetch_clips_with_params(
@@ -50,7 +52,7 @@ impl DataQuery for DataQueryService {
     }
 
     async fn fetch_schema(&self) -> Result<SchemaResponse, ServerError> {
-        self.data_store.query_schema().await
+        self.data_store.query_schema(&self.config).await
     }
 
     async fn fetch_bounding_boxes(&self, clip_id: &str) -> Result<Vec<BoundingBox>, ServerError> {
