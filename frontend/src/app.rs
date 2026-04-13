@@ -257,18 +257,6 @@ impl CairnApp {
     fn columns_section(&mut self, ui: &mut Ui) {
         ui.add_space(4.0);
         ui.horizontal(|ui| {
-            let arrow = if self.columns_expanded { "▾" } else { "▸" };
-            if ui
-                .button(
-                    RichText::new(format!("{}  columns", arrow))
-                        .strong()
-                        .size(12.0),
-                )
-                .clicked()
-            {
-                self.columns_expanded = !self.columns_expanded;
-            }
-
             let active_count: usize = self
                 .filters
                 .values()
@@ -284,10 +272,6 @@ impl CairnApp {
                 );
             }
         });
-
-        if !self.columns_expanded {
-            return;
-        }
 
         ui.add_space(6.0);
 
@@ -314,7 +298,7 @@ impl CairnApp {
         if let Some(table_name) = &self.selected_table.clone() {
             if let Some(table) = self.tables.iter().find(|t| &t.table_name == table_name) {
                 let columns = table.columns.clone();
-                ScrollArea::vertical()
+                ScrollArea::horizontal()
                     .id_salt("col_scroll")
                     .max_height(200.0)
                     .show(ui, |ui| {
