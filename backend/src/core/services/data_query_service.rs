@@ -44,7 +44,9 @@ impl DataQuery for DataQueryService {
         clip_id: &str,
         num_spins: usize,
     ) -> Result<Vec<PointCloud>, ServerError> {
-        self.data_store.query_point_clouds(clip_id, num_spins).await
+        self.data_store
+            .query_point_clouds(&self.config, clip_id, num_spins)
+            .await
     }
 
     async fn fetch_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, ServerError> {

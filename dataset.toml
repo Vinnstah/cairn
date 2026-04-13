@@ -13,8 +13,11 @@ path = "/Users/viktorjansson/Developer/Rust/cairn/data/nvidia_physical_dataset/l
 description = "LiDAR for the NVIDIA PhysicalAI Autonomous Vehicles dataset"
 file_ext = ".lidar_top_360fov.parquet"
 
+[datasets.characteristics]
+contains_lidar = true
+
 [datasets.characteristics.semantics]
-timestamp = "timestamp_us"
+timestamp = "spin_start_timestamp"
 
 [[datasets]]
 name = "obstacles"

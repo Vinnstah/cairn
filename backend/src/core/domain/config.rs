@@ -36,6 +36,7 @@ pub struct SchemaDefinition {
 #[derive(Debug, Deserialize, Clone)]
 pub struct Characteristics {
     pub contains_classes: Option<bool>,
+    pub contains_lidar: Option<bool>,
     pub semantics: Semantics,
 }
 

@@ -13,7 +13,10 @@ use crate::{
     adapters::querier::session_context::PointClouds,
     core::{
         build_dataset_path,
-        domain::model::{EgoMotion, PointCloud},
+        domain::{
+            config::Config,
+            model::{EgoMotion, PointCloud},
+        },
     },
     error::ServerError,
 };
@@ -96,14 +99,21 @@ fn convert_record_batches_to_point_clouds(batches: Vec<RecordBatch>) -> Vec<Poin
 
 pub async fn load_point_clouds(
     ctx: &SessionContext,
+    config: &Config,
     clip_id: &str,
     num_spins: usize,
 ) -> Result<Vec<PointCloud>, ServerError> {
     info!("load_point_clouds start for clip {}", clip_id);
 
-    let path = build_dataset_path()
-        .join("lidar.chunk_0000")
-        .join(format!("{}.lidar_top_360fov.parquet", clip_id));
+    let dataset = config
+        .datasets
+        .iter()
+        .find(|dataset| dataset.characteristics.contains_lidar.is_some())
+        .expect("find lidar dataset");
+
+    let path = dataset
+        .path
+        .join(format!("{}{}", clip_id, dataset.file_ext));
 
     if !path.exists() {
         warn!("lidar file not found for clip {}, skipping", clip_id);
@@ -119,9 +129,16 @@ pub async fn load_point_clouds(
     )
     .await?;
 
+    let timestamp_name = dataset
+        .characteristics
+        .semantics
+        .timestamp
+        .as_ref()
+        .expect("get timestamp semantic");
+
     let df = ctx
         .sql(&format!(
-            "SELECT spin_start_timestamp, draco_encoded_pointcloud
+            "SELECT {timestamp_name}, draco_encoded_pointcloud
         FROM {table_name}
         WHERE spin_index <= {num_spins}",
         ))
@@ -139,6 +156,7 @@ pub async fn load_point_clouds(
         return Ok(vec![]);
     }
 
+    // Move into its own function to support different encodings
     let point_clouds = convert_record_batches_to_point_clouds(batches);
     info!(
         "decoded {} point clouds for clip {}",

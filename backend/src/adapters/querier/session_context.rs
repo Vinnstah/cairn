@@ -89,11 +89,12 @@ impl DataStore for SessionContext {
 
     async fn query_point_clouds(
         &self,
+        config: &Config,
         clip_id: &str,
         num_spins: usize,
     ) -> Result<Vec<PointCloud>, ServerError> {
         info!("query point clouds");
-        load_point_clouds(self, clip_id, num_spins).await
+        load_point_clouds(self, config, clip_id, num_spins).await
     }
 
     async fn query_ego_motion(&self, clip_id: &str) -> Result<Vec<EgoMotion>, ServerError> {

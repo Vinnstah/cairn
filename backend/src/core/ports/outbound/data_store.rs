@@ -18,6 +18,7 @@ pub trait DataStore {
     ) -> Result<Vec<String>, ServerError>;
     async fn query_point_clouds(
         &self,
+        config: &Config,
         clip_id: &str,
         num_spins: usize,
     ) -> Result<Vec<PointCloud>, ServerError>;

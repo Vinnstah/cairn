@@ -88,6 +88,88 @@ Each request queries the Parquet files via DataFusion SQL, finds matching clip U
  
 ---
 
+## Configuration
+
+Cairn is configured via a `dataset.toml` file. This tells the backend which datasets to register, where to find them on disk, and what semantic meaning their columns carry.
+
+### Structure
+
+Each dataset is declared as an entry in the `[[datasets]]` array. The backend iterates these on startup, registers each folder as a queryable SQL table, and injects `clip_id` from filenames automatically.
+
+```toml
+[[datasets]]
+name        = "ego_motion"   # SQL table name used in queries
+path        = "/path/to/egomotion.chunk_0000"
+description = "Ego motion for the NVIDIA PhysicalAI-AV dataset"
+file_ext    = ".egomotion.parquet"   # only files with this suffix are registered
+
+[datasets.characteristics.semantics]
+timestamp = "timestamp"   # which column holds the relative timestamp
+```
+
+### Characteristics
+
+The optional `[datasets.characteristics]` section tells Cairn how to treat this dataset during replay and scenario mining:
+
+| Key | Type | Effect |
+|---|---|---|
+| `contains_lidar` | bool | Marks this dataset as the LiDAR source. Clips must have a matching entry here to be returned by search queries. |
+| `contains_classes` | bool | Marks this dataset as the obstacle/classification source. The `label_class` semantic column is used to populate the frontend filter pills and `label_classes` search params. |
+
+### Semantics
+
+`[datasets.characteristics.semantics]` maps logical roles to actual column names in the Parquet files:
+
+| Key | Effect |
+|---|---|
+| `timestamp` | Column used to align this dataset to `ego_time` during replay |
+| `label_class` | Column queried for `DISTINCT` values shown as filter pills in the frontend, and used in `WHERE label_class IN (...)` search queries |
+
+### Full example
+
+```toml
+[[datasets]]
+name        = "ego_motion"
+path        = "/data/nvidia_physical_dataset/egomotion.chunk_0000"
+description = "Ego motion — pose, velocity, acceleration at ~100 Hz"
+file_ext    = ".egomotion.parquet"
+
+[datasets.characteristics.semantics]
+timestamp = "timestamp"
+
+[[datasets]]
+name        = "lidar"
+path        = "/data/nvidia_physical_dataset/lidar.chunk_0000"
+description = "LiDAR point clouds — Draco-encoded, ~200 spins per clip at 10 Hz"
+file_ext    = ".lidar_top_360fov.parquet"
+
+[datasets.characteristics]
+contains_lidar = true
+
+[datasets.characteristics.semantics]
+timestamp = "spin_start_timestamp"
+
+[[datasets]]
+name        = "obstacles"
+path        = "/data/nvidia_physical_dataset/obstacle.offline.chunk_0000"
+description = "Obstacle detections with bounding boxes and class labels"
+file_ext    = ".obstacle.offline.parquet"
+
+[datasets.characteristics]
+contains_classes = true
+
+[datasets.characteristics.semantics]
+label_class = "label_class"
+```
+
+### Notes
+
+- `path` should be an absolute path to the chunk folder. All `.parquet` files matching `file_ext` inside that folder will be registered.
+- `clip_id` does not need to be declared — it is injected automatically from the filename prefix (`<uuid>.<file_ext>`).
+- Datasets without a `characteristics` section are registered and queryable but are not used for search filtering or replay routing.
+
+---
+
 ## Architecture
 The app is split into 3 different crate: *backend*, *frontend* and *shared*.
 
@@ -95,29 +177,6 @@ The app is split into 3 different crate: *backend*, *frontend* and *shared*.
 - **`backend`** — ports-and-adapters ([hexagonal](https://alistair.cockburn.us/hexagonal-architecture)) architecture; core domain has no infrastructure dependencies
 - **`frontend`** — native desktop GUI built with [eframe](https://crates.io/crates/eframe) and egui
 
-### Dataset layout expected on disk
-
-```
-./data/nvidia_physical_dataset/
-├── egomotion.chunk_0000/
-│   └── <clip_uuid>.egomotion.parquet
-│       # timestamp (relative µs), x, y, z, qx, qy, qz, qw
-│       # vx, vy, vz, ax, ay, az, curvature — ~2500 rows/clip at ~100 Hz
-├── camera_front_wide_120fov.chunk_0000/    # not yet fully supported
-│   ├── <clip_uuid>.camera_front_wide_120fov.mp4
-│   └── <clip_uuid>.camera_front_wide_120fov.timestamps.parquet
-├── lidar.chunk_0000/
-│   └── <clip_uuid>.lidar_top_360fov.parquet
-│       # spin_index, spin_start_timestamp, draco_encoded_pointcloud
-│       # ~200 spins/clip at 10 Hz
-├── obstacle.offline.chunk_0000/
-│   └── <clip_uuid>.obstacle.offline.parquet
-│       # timestamp_us, track_id, label_class, center_x/y/z, size_x/y/z
-│       # orientation quaternion, reference_frame
-└── metadata/
-    └── data_collection.parquet
-        # clip_id, country, month, hour_of_day, platform_class
-```
  
 ### Notable implementation details
  
