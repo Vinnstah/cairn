@@ -61,7 +61,7 @@ impl DataStore for SessionContext {
     async fn register_tables(&self, datasets: Vec<Dataset>) -> Result<(), ServerError> {
         info!("Registering datasets");
         for dataset in datasets {
-            match dataset.semantics.clip_id.is_some() {
+            match dataset.characteristics.semantics.clip_id.is_some() {
                 true => {
                     let _ = self
                         .register_parquet(
@@ -143,20 +143,25 @@ impl DataStore for SessionContext {
     }
 
     async fn query_label_classes(&self, config: &Config) -> Result<Vec<String>, ServerError> {
-        let Some(classification) = config
+        let dataset = config
             .datasets
             .iter()
-            .find_map(|d| d.classification.as_ref().map(|c| (d.name.as_str(), c)))
-        else {
-            return Ok(vec![]);
-        };
+            .find(|dataset| dataset.characteristics.contains_classes.is_some())
+            .expect("find label dataset");
 
-        let (table, spec) = classification;
-        let label_class = spec.label_class.clone().unwrap();
+        let label_class_semantic = dataset
+            .characteristics
+            .semantics
+            .label_class
+            .as_ref()
+            .expect("get label class semantic");
+
+        let table = &dataset.name;
+
         let df = self
             .sql(&format!(
                 "SELECT DISTINCT {:?} FROM {} WHERE {:?} IS NOT NULL ORDER BY {:?}",
-                &label_class, table, &label_class, &label_class
+                &label_class_semantic, table, &label_class_semantic, &label_class_semantic
             ))
             .await?;
 
@@ -165,7 +170,7 @@ impl DataStore for SessionContext {
 
         for batch in &batches {
             let col = batch
-                .column_by_name(spec.label_class.clone().expect("get label_class").as_ref())
+                .column_by_name(&label_class_semantic)
                 .ok_or(CairnError::MissingColumn("label_class"))?
                 .as_any()
                 .downcast_ref::<arrow::array::StringViewArray>()

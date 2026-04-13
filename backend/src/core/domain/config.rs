@@ -14,8 +14,7 @@ pub struct Dataset {
     pub file_ext: String,
     pub description: Option<String>,
     pub schema: Option<SchemaDefinition>,
-    pub classification: Option<ClassificationSpec>,
-    pub semantics: Semantics,
+    pub characteristics: Characteristics,
 }
 
 /// Domain representation of a column field — mirrors Arrow's Field
@@ -34,16 +33,14 @@ pub struct SchemaDefinition {
     pub fields: Vec<FieldDefinition>,
     pub metadata: HashMap<String, String>,
 }
-
 #[derive(Debug, Deserialize, Clone)]
-pub struct Semantics {
-    pub timestamp: Option<String>,
-    pub clip_id: Option<String>,
-    pub label_class: Option<String>,
+pub struct Characteristics {
+    pub contains_classes: Option<bool>,
+    pub semantics: Semantics,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct ClassificationSpec {
+pub struct Semantics {
     pub timestamp: Option<String>,
     pub clip_id: Option<String>,
     pub label_class: Option<String>,

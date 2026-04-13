@@ -4,7 +4,7 @@ path = "/Users/viktorjansson/Developer/Rust/cairn/data/nvidia_physical_dataset/e
 description = "ego_motion for the NVIDIA PhysicalAI Autonomous Vehicles dataset"
 file_ext = ".egomotion.parquet"
 
-[datasets.semantics]
+[datasets.characteristics.semantics]
 timestamp = "timestamp"
 
 [[datasets]]
@@ -13,7 +13,7 @@ path = "/Users/viktorjansson/Developer/Rust/cairn/data/nvidia_physical_dataset/l
 description = "LiDAR for the NVIDIA PhysicalAI Autonomous Vehicles dataset"
 file_ext = ".lidar_top_360fov.parquet"
 
-[datasets.semantics]
+[datasets.characteristics.semantics]
 timestamp = "timestamp_us"
 
 [[datasets]]
@@ -22,9 +22,8 @@ path = "/Users/viktorjansson/Developer/Rust/cairn/data/nvidia_physical_dataset/o
 description = "Obstacles for the NVIDIA PhysicalAI Autonomous Vehicles dataset"
 file_ext = ".obstacle.offline.parquet"
 
-[datasets.classification]
-timestamp = "timestamp_us"
+[datasets.characteristics.semantics]
 label_class = "label_class"
 
-[datasets.semantics]
-label_class = "label_class"
+[datasets.characteristics]
+contains_classes = true
